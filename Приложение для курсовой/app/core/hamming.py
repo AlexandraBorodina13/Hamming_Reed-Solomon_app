@@ -1,6 +1,8 @@
 import numpy as np
 import math
+from functools import lru_cache
 
+@lru_cache(maxsize=128)
 def hamming_general_matrices(m):
     """
     Генерация матриц Хэмминга для n = 2^m - 1, k = n - m.
@@ -41,6 +43,7 @@ def encode_general(message_bits, m):
     if len(message_bits) != k:
         raise ValueError(f"Длина сообщения должна быть {k} бит")
     return (message_bits @ G) % 2
+
 
 def syndrome_general(received, m):
     """Вычисление синдрома для обобщенного кода"""

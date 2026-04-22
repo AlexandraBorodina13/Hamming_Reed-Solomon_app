@@ -1,9 +1,9 @@
 import io
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.pagesizes import letter, A4, landscape
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
-from reportlab.lib.units import inch
+from reportlab.lib.units import inch, mm
 import numpy as np
 from datetime import datetime
 from reportlab.pdfbase import pdfmetrics
@@ -30,9 +30,26 @@ except:
 def create_pdf_report(steps, m, n, k, original_message, encoded_message, received_message, decoded_message):
     """Создание PDF отчета с использованием ReportLab"""
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+    
+    # Определяем ориентацию страницы в зависимости от размера матрицы
+    use_landscape = False
+    for step in steps:
+        if step.type == "matrix":
+            H = step.payload["H"]
+            # Если матрица широкая (больше 15 столбцов), используем альбомную ориентацию
+            if H.shape[1] > 15:
+                use_landscape = True
+            break
+    
+    # Выбираем ориентацию страницы
+    if use_landscape:
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=30)
+    else:
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=30)
+    
     styles = getSampleStyleSheet()
     FONT_NAME = "DejaVuSans"
+    
     # Создаем custom стили с поддержкой кириллицы
     styles.add(ParagraphStyle(
         name='CustomTitle',
@@ -56,9 +73,9 @@ def create_pdf_report(steps, m, n, k, original_message, encoded_message, receive
     styles.add(ParagraphStyle(
         name='NormalText',
         parent=styles['Normal'],
-        fontName=FONT_NAME
+        fontName=FONT_NAME,
+        fontSize=10
     ))
-    
     
     story = []
     
@@ -92,24 +109,52 @@ def create_pdf_report(steps, m, n, k, original_message, encoded_message, receive
         
         if step.type == "matrix":
             H = step.payload["H"]
-            # Создаем таблицу для матрицы H
+            
+            # Для больших матриц используем альбомную ориентацию и меньший шрифт
+            if H.shape[1] > 20:
+                # Очень большая матрица - используем очень маленький шрифт
+                font_size = 5
+                col_width = 0.12 * inch
+            elif H.shape[1] > 15:
+                font_size = 6
+                col_width = 0.15 * inch
+            elif H.shape[1] > 10:
+                font_size = 7
+                col_width = 0.2 * inch
+            else:
+                font_size = 8
+                col_width = 0.25 * inch
+            
+            # Создаем таблицу для матрицы H с автоматическим переносом
             data = [[''] + [f'b{j}' for j in range(n)]]
             for row_idx, row in enumerate(H):
                 data.append([f's{row_idx}'] + list(map(str, row)))
             
-            t = Table(data)
+            # Рассчитываем ширину колонок
+            col_widths = [0.4 * inch] + [col_width] * n
+            
+            t = Table(data, colWidths=col_widths, repeatRows=1)
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                ('FONTSIZE', (0, 0), (-1, 0), font_size + 1),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 4),
+                ('TOPPADDING', (0, 0), (-1, 0), 4),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                ('FONTSIZE', (0, 0), (-1, -1), 8)
+                ('FONTSIZE', (0, 1), (-1, -1), font_size),
+                ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 2),
             ]))
             story.append(t)
+            
+            # Добавляем примечание для больших матриц
+            if H.shape[1] > 15:
+                note = Paragraph("<i>Примечание: Для отображения полной матрицы используется уменьшенный размер шрифта</i>", styles['NormalText'])
+                story.append(note)
             
             # Описание матрицы
             desc = Paragraph("Проверочная матрица H используется для вычисления синдрома ошибки", styles['NormalText'])
@@ -119,21 +164,27 @@ def create_pdf_report(steps, m, n, k, original_message, encoded_message, receive
             r = step.payload["received"]
             s = step.payload["syndrome"]
             
+            # Для длинных векторов показываем с переносом
+            r_str = ' '.join(map(str, r))
+            s_str = ' '.join(map(str, s))
+            
             # Таблица с векторами
             data = [
                 ['Вектор', 'Значение'],
-                ['Принятый вектор (r)', ' '.join(map(str, r))],
-                ['Синдром (s = r·Hᵀ)', ' '.join(map(str, s))]
+                ['Принятый вектор (r)', r_str],
+                ['Синдром (s = r·Hᵀ)', s_str]
             ]
             
-            t = Table(data, colWidths=[2*inch, 4*inch])
+            t = Table(data, colWidths=[1.5*inch, 4.5*inch])
             t.setStyle(TableStyle([
-                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSans'),        # <-- Явно указываем шрифт
-                ('FONTSIZE', (0, 0), (-1, -1), 10),                  # размер шрифта
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSans'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
-                ('FONTNAME', (0, 0), (-1, 0), 'DejaVuSans-Bold'),    # Заголовок жирным
+                ('FONTNAME', (0, 0), (-1, 0), 'DejaVuSans-Bold'),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('WORDWRAP', (1, 1), (1, -1), 'CJK'),  # Включаем перенос слов
             ]))
             story.append(t)
             
@@ -176,13 +227,13 @@ def create_pdf_report(steps, m, n, k, original_message, encoded_message, receive
                 ['Информационные биты', ' '.join(map(str, info_bits))]
             ]
             
-            t = Table(data, colWidths=[2*inch, 4*inch])
+            t = Table(data, colWidths=[1.5*inch, 4.5*inch])
             t.setStyle(TableStyle([
-                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSans'),        # <-- Явно указываем шрифт
-                ('FONTSIZE', (0, 0), (-1, -1), 10),                  # размер шрифта
+                ('FONTNAME', (0, 0), (-1, -1), 'DejaVuSans'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                 ('BACKGROUND', (0, 0), (-1, 0), colors.lightgreen),
-                ('FONTNAME', (0, 0), (-1, 0), 'DejaVuSans-Bold'),    # Заголовок жирным
+                ('FONTNAME', (0, 0), (-1, 0), 'DejaVuSans-Bold'),
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
             ]))
             story.append(t)
@@ -447,20 +498,37 @@ def create_rs_pdf_report(steps, n, k, m, original_message, encoded_message, rece
             data = [['Позиция', 'Значение', 'Символ']]
             
             # Показываем только первые 10 и последние 10 символов
-            if len(codeword) > 20:
-                for pos in range(10):
-                    val = codeword[pos]
-                    symbol = f"'{chr(val)}'" if 32 <= val < 127 else 'N/A'
-                    data.append([str(pos), str(val), symbol])
-                data.append(['...', '...', '...'])
-                for pos in range(len(codeword)-10, len(codeword)):
-                    val = codeword[pos]
-                    symbol = f"'{chr(val)}'" if 32 <= val < 127 else 'N/A'
-                    data.append([str(pos), str(val), symbol])
-            else:
+            if len(codeword) > 30:
+                # Находим все ненулевые позиции
+                non_zero_positions = []
+                zero_ranges = []
+                current_zero_start = None
+                
                 for pos, val in enumerate(codeword):
+                    if val != 0:
+                        non_zero_positions.append(pos)
+                        current_zero_start = None
+                    else:
+                        if current_zero_start is None:
+                            current_zero_start = pos
+                
+                # Добавляем все ненулевые позиции
+                for pos in non_zero_positions:
+                    val = codeword[pos]
                     symbol = f"'{chr(val)}'" if 32 <= val < 127 else 'N/A'
                     data.append([str(pos), str(val), symbol])
+                
+                # Добавляем информацию о пропущенных нулях
+                if len(codeword) - len(non_zero_positions) > 0:
+                    data.append(['...', f'({len(codeword) - len(non_zero_positions)} нулевых позиций)', '...'])
+                
+                # Добавляем последние 5 позиций
+                last_5_start = max(0, len(codeword) - 5)
+                for pos in range(last_5_start, len(codeword)):
+                    if pos not in non_zero_positions:  # Избегаем дублирования
+                        val = codeword[pos]
+                        symbol = f"'{chr(val)}'" if 32 <= val < 127 else 'N/A'
+                        data.append([str(pos), str(val), symbol])
             
             t = Table(data, colWidths=[0.5*inch, 0.8*inch, 0.8*inch])
             t.setStyle(TableStyle([
@@ -561,7 +629,8 @@ def create_rs_pdf_report(steps, n, k, m, original_message, encoded_message, rece
     return buffer
 
 def generate_rs_html_report(steps, n, k, m, original_message, encoded_message, received_message, decoded_message):
-    """Генерация HTML отчета для Рида-Соломона"""
+    """Генерация HTML отчета для Рида-Соломона с умным отображением"""
+    
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -610,19 +679,16 @@ def generate_rs_html_report(steps, n, k, m, original_message, encoded_message, r
                 width: 100%;
                 border-collapse: collapse;
                 margin: 15px 0;
-                font-size: 14px;
+                font-size: 12px;
             }}
             th, td {{
                 border: 1px solid #dee2e6;
-                padding: 8px;
+                padding: 6px;
                 text-align: center;
             }}
             th {{
                 background-color: #28a745;
                 color: white;
-            }}
-            .matrix-table th {{
-                background-color: #6c757d;
             }}
             .success {{
                 color: #28a745;
@@ -632,16 +698,24 @@ def generate_rs_html_report(steps, n, k, m, original_message, encoded_message, r
                 color: #dc3545;
                 font-weight: bold;
             }}
-            .highlight {{
-                background-color: #fff3cd;
-                padding: 2px 4px;
-                border-radius: 3px;
+            .zero-row {{
+                background-color: #f8f9fa;
+                color: #6c757d;
+                font-style: italic;
             }}
             .footer {{
                 text-align: center;
                 margin-top: 40px;
                 color: #6c757d;
                 font-size: 12px;
+            }}
+            details {{
+                margin: 10px 0;
+            }}
+            summary {{
+                cursor: pointer;
+                color: #28a745;
+                font-weight: bold;
             }}
         </style>
     </head>
@@ -665,10 +739,7 @@ def generate_rs_html_report(steps, n, k, m, original_message, encoded_message, r
     """
     
     for i, step in enumerate(steps, 1):
-        html += f'''
-        <div class="step">
-            <div class="step-title">Шаг {i}: {step.title}</div>
-        '''
+        html += f'<div class="step"><div class="step-title">Шаг {i}: {step.title}</div>'
         
         if step.type == "text":
             html += f'<p>{step.payload["description"]}</p>'
@@ -676,12 +747,60 @@ def generate_rs_html_report(steps, n, k, m, original_message, encoded_message, r
         elif step.type == "matrix":
             codeword = step.payload["codeword"]
             html += '<h3>Кодовое слово:</h3>'
-            html += '<table class="matrix-table">'
-            html += '<tr><th>Позиция</th><th>Значение</th><th>Символ</th></tr>'
-            for pos, val in enumerate(codeword):
-                symbol = f"'{chr(val)}'" if 32 <= val < 127 else 'N/A'
-                html += f'<tr><td>{pos}</td><td>{val}</td><td>{symbol}</td></tr>'
-            html += '</table>'
+            
+            if len(codeword) > 30:
+                # Находим все ненулевые позиции
+                non_zero_positions = [(pos, val) for pos, val in enumerate(codeword) if val != 0]
+                
+                # Таблица с ненулевыми позициями
+                html += '<table>'
+                html += '<tr><th>Позиция</th><th>Значение</th><th>Символ</th></tr>'
+                
+                for pos, val in non_zero_positions:
+                    symbol = f"'{chr(val)}'" if 32 <= val < 127 else 'N/A'
+                    html += f'<tr><td>{pos}</td><td>{val}</td><td>{symbol}</td></tr>'
+                
+                # Сворачиваемый блок с нулевыми позициями
+                zero_count = len(codeword) - len(non_zero_positions)
+                if zero_count > 0:
+                    html += f'''
+                    <tr class="zero-row">
+                        <td colspan="3">
+                            <details>
+                                <summary>Показать {zero_count} нулевых позиций</summary>
+                                <table style="margin-top: 10px;">
+                                    <tr><th>Позиция</th><th>Значение</th><th>Символ</th></tr>
+                    '''
+                    
+                    # Показываем все нулевые позиции в свернутом виде
+                    for pos, val in enumerate(codeword):
+                        if val == 0:
+                            html += f'<tr><td>{pos}</td><td>0</td><td>N/A</td></tr>'
+                    
+                    html += '</table></details></td></tr>'
+                
+                # Последние 5 позиций (если они не были показаны)
+                last_5_start = max(0, len(codeword) - 5)
+                last_5_non_zero = [pos for pos, _ in non_zero_positions if pos >= last_5_start]
+                
+                if len(last_5_non_zero) < 5:
+                    html += '<tr><td colspan="3"><strong>Последние 5 позиций:</strong></td></tr>'
+                    for pos in range(last_5_start, len(codeword)):
+                        val = codeword[pos]
+                        symbol = f"'{chr(val)}'" if 32 <= val < 127 else 'N/A'
+                        html += f'<tr><td>{pos}</td><td>{val}</td><td>{symbol}</td></tr>'
+                
+                html += '</table>'
+                html += f'<p><em>Показаны все ненулевые позиции и последние 5 позиций. Нулевые позиции скрыты в сворачиваемом блоке.</em></p>'
+            else:
+                # Для коротких слов показываем всё
+                html += '<table>'
+                html += '<tr><th>Позиция</th><th>Значение</th><th>Символ</th></tr>'
+                for pos, val in enumerate(codeword):
+                    symbol = f"'{chr(val)}'" if 32 <= val < 127 else 'N/A'
+                    html += f'<tr><td>{pos}</td><td>{val}</td><td>{symbol}</td></tr>'
+                html += '</table>'
+            
             html += f'<p><em>Длина кодового слова: {len(codeword)} символов</em></p>'
         
         elif step.type == "calc":
@@ -690,8 +809,10 @@ def generate_rs_html_report(steps, n, k, m, original_message, encoded_message, r
             html += '<h3>Синдромы:</h3>'
             html += '<table>'
             html += '<tr><th>Синдром</th><th>Значение</th></tr>'
-            for idx, s in enumerate(syndromes):
+            for idx, s in enumerate(syndromes[:20]):  # Показываем первые 20 синдромов
                 html += f'<tr><td>S{idx}</td><td>{s}</td></tr>'
+            if len(syndromes) > 20:
+                html += f'<tr><td colspan="2"><em>... и еще {len(syndromes) - 20} синдромов</em></td></tr>'
             html += '</table>'
             html += f'<p><em>Формула: {formula}</em></p>'
         
@@ -699,7 +820,10 @@ def generate_rs_html_report(steps, n, k, m, original_message, encoded_message, r
             if step.payload.get("success", True):
                 corrected = step.payload["corrected"]
                 decoded = step.payload["decoded"]
-                html += f'<p><strong>Исправленное кодовое слово:</strong> {" ".join(map(str, corrected))}</p>'
+                corrected_preview = ' '.join(map(str, corrected[:50]))
+                if len(corrected) > 50:
+                    corrected_preview += "..."
+                html += f'<p><strong>Исправленное кодовое слово:</strong> {corrected_preview}</p>'
                 html += f'<p><strong>Декодированное сообщение:</strong> <span class="success">{decoded}</span></p>'
                 html += '<p class="success">Декодирование завершено успешно!</p>'
             else:
@@ -714,5 +838,5 @@ def generate_rs_html_report(steps, n, k, m, original_message, encoded_message, r
     </body>
     </html>
     '''
+    
     return html
-

@@ -1,8 +1,9 @@
 ﻿import numpy as np
 import galois
 import random
+from functools import lru_cache
 
-
+@lru_cache(maxsize=32)
 def rs_make(n=255, k=223, m=8):
     GF = galois.GF(2**m)
     RS = galois.ReedSolomon(n, k, field=GF)
