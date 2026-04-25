@@ -22,7 +22,9 @@ from app.core.reed_solomon import (rs_make, rs_encode_bytes, rs_decode_symbols,
                                    rs_add_errors)
 from app.explain.rs_steps import explain_rs
 from app.core.bch import BCHCode, get_bch_code
+from app.explain.bch_steps import explain_bch
 from app.core.convolutional import ConvolutionalCode, STANDARD_CONVOLUTIONAL_CODES
+
 
 # Кэширование для тяжелых операций
 @st.cache_data
@@ -35,6 +37,10 @@ def get_hamming_matrices_cached(m):
 def get_rs_code_cached(n, k, m):
     """Кэширование RS кода"""
     return rs_make(n, k, m)
+
+"""@st.cache_resource
+def get_bch_cached(n, k):
+    return get_bch_code(n, k)"""
 
 # Настройка страницы
 st.set_page_config(
@@ -636,11 +642,11 @@ elif mode == "БЧХ":
     st.sidebar.subheader("Параметры кода БЧХ")
     # Только проверенные комбинации (работают в galois.BCH)
     allowed_codes = {
-    7: [4],      # (7,4) – исправляет 1 ошибку
-    15: [11],    # (15,11) – исправляет 1 ошибку
-    31: [26],    # (31,26) – исправляет 1 ошибку
-    63: [57]     # (63,57) – исправляет 1 ошибку
-}
+        7: [4],      # (7,4) – исправляет 1 ошибку
+        15: [11],    # (15,11) – исправляет 1 ошибку
+        31: [26],    # (31,26) – исправляет 1 ошибку
+        63: [57]     # (63,57) – исправляет 1 ошибку
+    }
     n = st.sidebar.selectbox("Длина кодового слова n", list(allowed_codes.keys()))
     k = st.sidebar.selectbox("Длина сообщения k", allowed_codes[n])
     t = (n - k) // 2   # будет 1 для всех выбранных
@@ -665,7 +671,7 @@ elif mode == "БЧХ":
             message = np.array([int(b) for b in msg_str], dtype=int)
 
             # Кодирование
-            if st.button("Кодировать"):
+            if st.button("Кодировать", key="bch_encode_btn"):
                 codeword = bch.encode(message)
                 st.success(f"Кодовое слово ({n} бит):\n{''.join(map(str, codeword))}")
                 st.session_state.bch_codeword = codeword
@@ -681,16 +687,15 @@ elif mode == "БЧХ":
                 error_mode = st.radio("Режим ошибки", ["Ручной выбор", "Автоматическая"], index=0)
 
                 if error_mode == "Ручной выбор":
-                    err_pos = st.slider("Позиция ошибки", 0, n-1, 0)
-                    if st.button("Внести ошибку"):
+                    err_pos = st.slider("Позиция ошибки", 0, n-1, 0, key="bch_manual_pos")
+                    if st.button("Внести ошибку", key="bch_manual_btn"):
                         noisy = codeword.copy()
                         noisy[err_pos] ^= 1
                         st.session_state.bch_noisy = noisy
                         st.session_state.bch_error_positions = [err_pos]
                         st.rerun()
                 else:
-                    # Автоматическая – одна случайная ошибка (так как t=1)
-                    if st.button("Сгенерировать случайную ошибку"):
+                    if st.button("Сгенерировать случайную ошибку", key="bch_auto_btn"):
                         noisy = codeword.copy()
                         err_pos = np.random.randint(0, n)
                         noisy[err_pos] ^= 1
@@ -702,27 +707,80 @@ elif mode == "БЧХ":
                 if st.session_state.get("bch_noisy") is not None:
                     noisy = st.session_state.bch_noisy
                     err_positions = st.session_state.bch_error_positions
-                    st.info(f"Принятое слово: {''.join(map(str, noisy))}")
+                    st.info(f"**Принятое слово:** {''.join(map(str, noisy))}")
                     st.warning(f"Внесена ошибка в позиции: {err_positions}")
 
-                    if st.button("Декодировать"):
-                        decoded, info = bch.decode(noisy)
-                        st.subheader("Результат декодирования")
+                    if st.button("Декодировать и показать шаги", key="bch_decode_btn"):
+                        with st.spinner("Декодирование..."):
+                            # Получаем пошаговое объяснение (внутри вызывается decode)
+                            steps = explain_bch(noisy, bch)
+                            # Декодируем ещё раз, чтобы получить информацию для отображения (можно и повторно использовать)
+                            decoded, info = bch.decode(noisy)
 
-                        col1, col2 = st.columns(2)
-                        col1.metric("Исходное сообщение", ''.join(map(str, message)))
-                        col2.metric("Декодированное", ''.join(map(str, decoded)))
+                            st.subheader("Пошаговый разбор декодирования")
 
-                        if info["success"] and np.array_equal(decoded, message):
-                            st.success("Сообщение восстановлено корректно!")
-                        else:
-                            st.error("Ошибка декодирования")
-                            if not info["success"]:
-                                st.write(f"Причина: {info.get('error', 'неизвестная ошибка')}")
+                            for i, step in enumerate(steps, 1):
+                                with st.expander(f"Шаг {i}: {step.title}", expanded=(i == 1)):
+                                    if step.type == "text":
+                                        st.write(step.payload["description"])
 
-                        with st.expander("Подробности"):
-                            st.write(f"Исправляемая способность t = {info['t']}")
-                            st.write(f"Найденные позиции ошибок: {info['error_positions']}")
+                                    elif step.type == "matrix":
+                                        word = step.payload["codeword"]
+                                        st.write("Кодовое слово (вектор битов):")
+                                        if len(word) > 50:
+                                            preview = word[:20] + ["..."] + word[-20:]
+                                            indices = list(range(20)) + ["..."] + list(range(len(word)-20, len(word)))
+                                            # Используем индекс для отображения позиции, без отдельной колонки "Позиция"
+                                            df = pd.DataFrame({"Значение": preview}, index=indices)
+                                            st.dataframe(df)  # показывает индекс как первый столбец
+                                        else:
+                                            df = pd.DataFrame({"Значение": word}, index=range(len(word)))
+                                            st.dataframe(df)
+
+                                    elif step.type == "calc":
+                                        # Здесь могут быть синдромы или информация об ошибках
+                                        if "syndromes" in step.payload:
+                                            syndromes = step.payload["syndromes"]
+                                            indices = step.payload.get("syndrome_indices", list(range(1, len(syndromes)+1)))
+ 
+                                            st.write("**Синдромы:**")
+ 
+                                            # Таблица: S1, S2, ..., S_2t
+                                            syndrome_data = {
+                                                "Синдром": [f"S{j}" for j in indices],
+                                                "Значение": syndromes,
+                                                "Нулевой": ["✓" if s == 0 else "✗" for s in syndromes],
+                                            }
+                                            st.table(pd.DataFrame(syndrome_data))
+ 
+                                            if "formula" in step.payload:
+                                                st.latex(step.payload["formula"])
+ 
+                                        if "error_positions" in step.payload:
+                                            err_pos = step.payload["error_positions"]
+                                            if err_pos:
+                                                st.success(f"Исправлены ошибки в позициях: {err_pos}")
+                                            else:
+                                                st.success("Ошибок не обнаружено")
+                                        if "description" in step.payload:
+                                            st.write(step.payload["description"])
+
+                                    elif step.type == "result":
+                                        if step.payload.get("success", True):
+                                            decoded_msg = step.payload["decoded"]
+                                            st.success("Декодирование завершено успешно!")
+                                            st.markdown(f"**Декодированное сообщение:** `{decoded_msg}`")
+                                            # Сравнение с исходным
+                                            original_msg = ''.join(map(str, message))
+                                            st.markdown(f"**Исходное сообщение:** `{original_msg}`")
+                                            if decoded_msg == original_msg:
+                                                st.success("Сообщение восстановлено корректно!")
+                                            else:
+                                                st.warning("Сообщение восстановлено с ошибкой")
+                                        else:
+                                            st.error(f"Ошибка декодирования: {step.payload.get('description', 'Неизвестная ошибка')}")
+
+                            st.info("Экспорт отчетов для БЧХ кода будет добавлен позже")
 
     except Exception as e:
         st.error(f"Ошибка: {e}")
