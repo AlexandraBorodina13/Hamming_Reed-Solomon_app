@@ -52,18 +52,18 @@ def explain_bch(received, bch_code):
 
     steps = []
 
-    # ── Шаг 1: Параметры кода ──────────────────────────────────────────────
+    # Шаг 1: Параметры кода 
     steps.append(Step(
         "text",
         "Параметры кода БЧХ",
         {"description": (
-            f"Код БЧХ ({n}, {k}): длина кодового слова n={n}, "
-            f"длина сообщения k={k}. Исправляет до t={t} ошибок.\n"
-            f"Код построен над полем GF(2^m), α — примитивный элемент поля."
+            f"Код БЧХ $({n}, {k})$: длина кодового слова $n={n}$, "
+            f"длина сообщения $k={k}$. Исправляет до $t={t}$ ошибок.\n\n"
+            f"Код построен над полем $GF(2^m)$, $\\alpha$ — примитивный элемент поля."
         )}
     ))
 
-    # ── Шаг 2: Принятое кодовое слово ──────────────────────────────────────
+    # Шаг 2: Принятое кодовое слово 
     received_list = received.tolist() if hasattr(received, 'tolist') else list(received)
     steps.append(Step(
         "matrix",
@@ -71,24 +71,24 @@ def explain_bch(received, bch_code):
         {"codeword": received_list}
     ))
 
-    # ── Шаг 3: Полином принятого слова ─────────────────────────────────────
+    # Шаг 3: Полином принятого слова 
     # galois хранит MSB-first: received[0] = коэф. при x^(n-1)
     poly_str = _bits_to_polynomial_msb(received_list)
     steps.append(Step(
         "text",
-        "Полином принятого слова R(x)",
+        "Полином принятого слова $R(x)$",
         {"description": (
             f"Биты кодового слова записываются MSB-first "
-            f"(первый бит — коэффициент при x^{n-1}):\n"
-            f"R(x) = {poly_str}\n\n"
-            f"Синдром вычисляется как Sⱼ = R(αʲ) — подстановка αʲ в R(x)."
+            f"(первый бит — коэффициент при $x^{{{n-1}}}$):\n\n)"
+            f"$$R(x) = {poly_str}$$\n\n"
+            f"Синдром вычисляется как $S_j = R(\\alpha^j)$ — подстановка $\\alpha^j$ в $R(x)$."
         )}
     ))
 
-    # ── Вычисление (внутри decode вызывается _compute_syndromes) ───────────
+    # Вычисление (внутри decode вызывается _compute_syndromes) 
     decoded, info = bch_code.decode(received)
 
-    # ── Шаг 4: Синдромы ────────────────────────────────────────────────────
+    # Шаг 4: Синдромы 
     syndromes = info.get("syndromes", [])
     if syndromes:
         j_indices = list(range(1, 2 * t + 1))
@@ -124,7 +124,7 @@ def explain_bch(received, bch_code):
             }
         ))
 
-    # ── Шаг 5: Исправление ошибок ──────────────────────────────────────────
+    # Шаг 5: Исправление ошибок 
     if info["success"]:
         error_positions = info["error_positions"]
         if error_positions:
@@ -145,7 +145,7 @@ def explain_bch(received, bch_code):
             }
         ))
 
-        # ── Шаг 6: Результат ───────────────────────────────────────────────
+        # Шаг 6: Результат
         steps.append(Step(
             "result",
             "Результат декодирования",
