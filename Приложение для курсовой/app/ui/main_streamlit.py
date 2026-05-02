@@ -764,6 +764,24 @@ elif mode == "БЧХ":
                                                 st.success("Ошибок не обнаружено")
                                         if "description" in step.payload:
                                             st.write(step.payload["description"])
+                                            
+                                            
+                                    elif step.type == "bm":
+                                        desc = step.payload.get("description", "")
+                                        st.markdown(desc)
+                                        lp = step.payload.get("locator_poly")
+                                        if lp is not None:
+                                            coeffs_str = ", ".join(map(str, lp))
+                                            st.info(f"Коэффициенты Λ(x): [{coeffs_str}]")
+
+                                    elif step.type == "chien":
+                                        desc = step.payload.get("description", "")
+                                        st.markdown(desc)
+                                        err_pos = step.payload.get("error_positions", [])
+                                        if err_pos:
+                                            st.success(f"Позиции ошибок, найденные поиском Ченя: {err_pos}")
+                                        else:
+                                            st.success("Ошибочных позиций не найдено")
 
                                     elif step.type == "result":
                                         if step.payload.get("success", True):

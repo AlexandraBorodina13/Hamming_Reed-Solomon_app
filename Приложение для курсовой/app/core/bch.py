@@ -15,14 +15,14 @@ class BCHCode:
         self.alpha = self.GF.primitive_element
 
         # Диагностика
-        st.warning(f"INIT: m={m}, GF=GF(2^{m}), alpha={repr(self.alpha)}")
-        st.warning(f"INIT: alpha**1={repr(self.alpha**1)}, int={(self.alpha**1).item()}")
+        #st.warning(f"INIT: m={m}, GF=GF(2^{m}), alpha={repr(self.alpha)}")
+        #st.warning(f"INIT: alpha**1={repr(self.alpha**1)}, int={(self.alpha**1).item()}")
         
         field_order = n  # порядок alpha = 2^m - 1 = n
         self._alpha_powers = [(self.alpha ** i).item() for i in range(field_order)]
         self._field_order = field_order
         
-        st.warning(f"INIT: alpha_powers = {self._alpha_powers}")
+        #st.warning(f"INIT: alpha_powers = {self._alpha_powers}")
 
     def encode(self, message):
         if len(message) != self.k:
@@ -52,48 +52,21 @@ class BCHCode:
             syndromes.append(s)
         return syndromes
 
-
-    """def decode(self, received):
-        if len(received) != self.n:
-            raise ValueError(f"Длина принятого слова должна быть {self.n}")
-
-        syndromes = self._compute_syndromes(received)
-    
-        # Вычисляем полином локаторов ошибок, если есть ненулевые синдромы
-        locator_poly = None
-        if any(s != 0 for s in syndromes):
-            locator_poly = self._berlekamp_massey(syndromes)
-
-        rec = self.field(np.array(received, dtype=int))
-        try:
-            decoded_message = self.bch.decode(rec)
-            corrected_codeword = self.bch.encode(decoded_message)
-            error_positions = [
-                i for i in range(self.n)
-                if int(received[i]) != int(corrected_codeword[i])
-            ]
-            return np.array(decoded_message, dtype=int), {
-                "success": True,
-                "error_positions": error_positions,
-                "t": self.t,
-                "syndromes": syndromes,
-                "locator_poly": locator_poly,  # добавляем Λ(x)
-            }
-        except Exception as e:
-            return np.zeros(self.k, dtype=int), {
-                "success": False,
-                "error": str(e),
-                "t": self.t,
-                "error_positions": [],
-                "syndromes": syndromes,
-                "locator_poly": locator_poly,  # добавляем даже при ошибке
-            }"""
-
     def decode(self, received):
         if len(received) != self.n:
             raise ValueError(f"Длина принятого слова должна быть {self.n}")
         syndromes = self._compute_syndromes(received)
         rec = self.bch.field(np.array(received, dtype=int))
+        
+        # Вычисляем lambda(x) если есть ненулевые синдромы
+        locator_poly = None
+        if any(s != 0 for s in syndromes):
+            locator_poly = self._berlekamp_massey(syndromes)
+    
+        rec = self.bch.field(np.array(received, dtype=int))
+        
+        
+        
         try:
             decoded_message = self.bch.decode(rec)
             corrected_codeword = self.bch.encode(decoded_message)
@@ -106,6 +79,7 @@ class BCHCode:
                 "error_positions": error_positions,
                 "t": self.t,
                 "syndromes": syndromes,
+                "locator_poly": locator_poly, #NEW
             }
         except Exception as e:
             return np.zeros(self.k, dtype=int), {
@@ -114,6 +88,7 @@ class BCHCode:
                 "t": self.t,
                 "error_positions": [],
                 "syndromes": syndromes,
+                "locator_poly": locator_poly, #NEW
             }
             
             
@@ -125,20 +100,23 @@ class BCHCode:
         Выход: список коэффициентов полинома Λ(x) = [λ0, λ1, ..., λv]
             где λ0 = 1, а v — количество ошибок
         """
-        GF = self.field
+        #GF = self.field
+        
+        GF = self.GF
+        
         t = self.t
     
         # Конвертируем синдромы в элементы поля
         S = [GF(s) if s != 0 else GF(0) for s in syndromes]
     
         # Инициализация
-        Lambda = [GF(1)]  # Λ(x) = 1
+        Lambda = [GF(1)]  # лямбда(x) = 1
         B = [GF(1)]       # B(x) = 1
         L = 0             # текущая длина регистра
         m = 1             # количество итераций с момента последнего изменения L
     
         for r in range(1, 2*t + 1):
-            # Вычисляем невязку Δr
+            # Вычисляем невязку дельтаr
             delta = S[r-1]
             for j in range(1, min(L, r) + 1):
                 if j < len(Lambda):
@@ -166,7 +144,7 @@ class BCHCode:
                 else:
                     m += 1
     
-        # Нормализация: делим на λ0 (должен быть 1)
+        # Нормализация: делим на лямбда0 (должен быть 1)
         if Lambda[0] != 1:
             factor = Lambda[0]
             Lambda = [c / factor for c in Lambda]
