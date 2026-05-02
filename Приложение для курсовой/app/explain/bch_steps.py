@@ -79,7 +79,7 @@ def explain_bch(received, bch_code):
         "Полином принятого слова $R(x)$",
         {"description": (
             f"Биты кодового слова записываются MSB-first "
-            f"(первый бит — коэффициент при $x^{{{n-1}}}$):\n\n)"
+            f"(первый бит — коэффициент при $x^{{{n-1}}}$):\n\n"
             f"$$R(x) = {poly_str}$$\n\n"
             f"Синдром вычисляется как $S_j = R(\\alpha^j)$ — подстановка $\\alpha^j$ в $R(x)$."
         )}
@@ -105,11 +105,11 @@ def explain_bch(received, bch_code):
 
         all_zero = all(s == 0 for s in syndromes)
         if all_zero:
-            verdict = "Все синдромы равны нулю → ошибок нет."
+            verdict = "Все синдромы равны нулю -> ошибок нет."
         else:
             nonzero = [j for j, s in zip(j_indices, syndromes) if s != 0]
             verdict = (
-                f"Ненулевые синдромы (j = {nonzero}) → обнаружены ошибки. "
+                f"Ненулевые синдромы (j = {nonzero}) -> обнаружены ошибки. "
                 "Алгоритм Берлекэмпа–Месси определит локаторы ошибок."
             )
 
@@ -123,6 +123,8 @@ def explain_bch(received, bch_code):
                 "description": f"{syndrome_display}\n\n{verdict}",
             }
         ))
+
+        
 
     # Шаг 5: Исправление ошибок 
     if info["success"]:

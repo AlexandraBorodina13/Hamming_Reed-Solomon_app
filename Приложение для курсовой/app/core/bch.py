@@ -52,6 +52,43 @@ class BCHCode:
             syndromes.append(s)
         return syndromes
 
+
+    """def decode(self, received):
+        if len(received) != self.n:
+            raise ValueError(f"Длина принятого слова должна быть {self.n}")
+
+        syndromes = self._compute_syndromes(received)
+    
+        # Вычисляем полином локаторов ошибок, если есть ненулевые синдромы
+        locator_poly = None
+        if any(s != 0 for s in syndromes):
+            locator_poly = self._berlekamp_massey(syndromes)
+
+        rec = self.field(np.array(received, dtype=int))
+        try:
+            decoded_message = self.bch.decode(rec)
+            corrected_codeword = self.bch.encode(decoded_message)
+            error_positions = [
+                i for i in range(self.n)
+                if int(received[i]) != int(corrected_codeword[i])
+            ]
+            return np.array(decoded_message, dtype=int), {
+                "success": True,
+                "error_positions": error_positions,
+                "t": self.t,
+                "syndromes": syndromes,
+                "locator_poly": locator_poly,  # добавляем Λ(x)
+            }
+        except Exception as e:
+            return np.zeros(self.k, dtype=int), {
+                "success": False,
+                "error": str(e),
+                "t": self.t,
+                "error_positions": [],
+                "syndromes": syndromes,
+                "locator_poly": locator_poly,  # добавляем даже при ошибке
+            }"""
+
     def decode(self, received):
         if len(received) != self.n:
             raise ValueError(f"Длина принятого слова должна быть {self.n}")
@@ -78,6 +115,63 @@ class BCHCode:
                 "error_positions": [],
                 "syndromes": syndromes,
             }
+            
+            
+    def _berlekamp_massey(self, syndromes):
+        """
+        Реализация алгоритма Берлекэмпа–Месси для нахождения полинома локаторов ошибок.
+    
+        Вход: список синдромов [S1, S2, ..., S2t]
+        Выход: список коэффициентов полинома Λ(x) = [λ0, λ1, ..., λv]
+            где λ0 = 1, а v — количество ошибок
+        """
+        GF = self.field
+        t = self.t
+    
+        # Конвертируем синдромы в элементы поля
+        S = [GF(s) if s != 0 else GF(0) for s in syndromes]
+    
+        # Инициализация
+        Lambda = [GF(1)]  # Λ(x) = 1
+        B = [GF(1)]       # B(x) = 1
+        L = 0             # текущая длина регистра
+        m = 1             # количество итераций с момента последнего изменения L
+    
+        for r in range(1, 2*t + 1):
+            # Вычисляем невязку Δr
+            delta = S[r-1]
+            for j in range(1, min(L, r) + 1):
+                if j < len(Lambda):
+                    delta += Lambda[j] * S[r-1-j]
+        
+            if delta == 0:
+                m += 1
+            else:
+                # Сохраняем старую Lambda
+                T = Lambda.copy()
+            
+                # Обновляем Lambda
+                # Удлиняем Lambda если нужно
+                while len(Lambda) < len(B) + m:
+                    Lambda.append(GF(0))
+            
+                for i in range(len(B)):
+                    if i + m < len(Lambda):
+                        Lambda[i + m] -= delta * B[i]
+            
+                if 2 * L <= r - 1:
+                    L = r - L
+                    B = T.copy()
+                    m = 1
+                else:
+                    m += 1
+    
+        # Нормализация: делим на λ0 (должен быть 1)
+        if Lambda[0] != 1:
+            factor = Lambda[0]
+            Lambda = [c / factor for c in Lambda]
+    
+        return [int(c) for c in Lambda]
 
 
 def get_bch_code(n, k):

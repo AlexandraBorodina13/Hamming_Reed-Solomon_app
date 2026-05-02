@@ -749,7 +749,7 @@ elif mode == "БЧХ":
                                             syndrome_data = {
                                                 "Синдром": [f"S{j}" for j in indices],
                                                 "Значение": syndromes,
-                                                "Нулевой": ["✓" if s == 0 else "✗" for s in syndromes],
+                                                "Нулевой": ["Да" if s == 0 else "Нет" for s in syndromes],
                                             }
                                             st.table(pd.DataFrame(syndrome_data))
  
