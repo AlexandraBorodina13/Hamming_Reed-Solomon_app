@@ -636,262 +636,261 @@ elif mode == "Рида–Соломона":
         st.rerun()
 
 # ==================== БЧХ ====================
-elif mode == "БЧХ":
-    st.header("Код БЧХ (Bose–Chaudhuri–Hocquenghem)")
-
-    st.sidebar.subheader("Параметры кода БЧХ")
-    # Только проверенные комбинации (работают в galois.BCH)
-    allowed_codes = {
-        7: [4],      # (7,4) – исправляет 1 ошибку
-        15: [11],    # (15,11) – исправляет 1 ошибку
-        31: [26],    # (31,26) – исправляет 1 ошибку
-        63: [57]     # (63,57) – исправляет 1 ошибку
-    }
-    n = st.sidebar.selectbox("Длина кодового слова n", list(allowed_codes.keys()))
-    k = st.sidebar.selectbox("Длина сообщения k", allowed_codes[n])
-    t = (n - k) // 2   # будет 1 для всех выбранных
-
-    st.sidebar.info(f"**Код ({n}, {k})**")
-    st.sidebar.info(f"Избыточность: {n - k} бит")
-    st.sidebar.info(f"Исправляет: до {t} ошибок")
-
-    try:
-        bch = get_bch_code(n, k)
-
-        # Ввод сообщения
-        default_msg = "1" * k
-        msg_str = st.text_input(f"Сообщение ({k} бит)", default_msg,
-                                help=f"Введите {k} бит (0 и 1)")
-
-        if len(msg_str) != k:
-            st.warning(f"Введите ровно {k} бит")
-        elif not set(msg_str).issubset("01"):
-            st.warning("Используйте только 0 и 1")
-        else:
-            message = np.array([int(b) for b in msg_str], dtype=int)
-
-            # Кодирование
-            if st.button("Кодировать", key="bch_encode_btn"):
-                codeword = bch.encode(message)
-                st.success(f"Кодовое слово ({n} бит):\n{''.join(map(str, codeword))}")
-                st.session_state.bch_codeword = codeword
-                st.session_state.bch_message = message
-
-            # Если есть закодированное слово – работаем с ошибками
-            if st.session_state.get("bch_codeword") is not None:
-                codeword = st.session_state.bch_codeword
-
-                st.markdown("---")
-                st.subheader("Внесение ошибок")
-
-                error_mode = st.radio("Режим ошибки", ["Ручной выбор", "Автоматическая"], index=0)
-
-                if error_mode == "Ручной выбор":
-                    err_pos = st.slider("Позиция ошибки", 0, n-1, 0, key="bch_manual_pos")
-                    if st.button("Внести ошибку", key="bch_manual_btn"):
-                        noisy = codeword.copy()
-                        noisy[err_pos] ^= 1
-                        st.session_state.bch_noisy = noisy
-                        st.session_state.bch_error_positions = [err_pos]
-                        st.rerun()
-                else:
-                    if st.button("Сгенерировать случайную ошибку", key="bch_auto_btn"):
-                        noisy = codeword.copy()
-                        err_pos = np.random.randint(0, n)
-                        noisy[err_pos] ^= 1
-                        st.session_state.bch_noisy = noisy
-                        st.session_state.bch_error_positions = [err_pos]
-                        st.rerun()
-
-                # Декодирование
-                if st.session_state.get("bch_noisy") is not None:
-                    noisy = st.session_state.bch_noisy
-                    err_positions = st.session_state.bch_error_positions
-                    st.info(f"**Принятое слово:** {''.join(map(str, noisy))}")
-                    st.warning(f"Внесена ошибка в позиции: {err_positions}")
-
-                    if st.button("Декодировать и показать шаги", key="bch_decode_btn"):
-                        with st.spinner("Декодирование..."):
-                            # Получаем пошаговое объяснение (внутри вызывается decode)
-                            steps = explain_bch(noisy, bch)
-                            # Декодируем ещё раз, чтобы получить информацию для отображения (можно и повторно использовать)
-                            decoded, info = bch.decode(noisy)
-
-                            st.subheader("Пошаговый разбор декодирования")
-
-                            for i, step in enumerate(steps, 1):
-                                with st.expander(f"Шаг {i}: {step.title}", expanded=(i == 1)):
-                                    if step.type == "text":
-                                        st.write(step.payload["description"])
-
-                                    elif step.type == "matrix":
-                                        word = step.payload["codeword"]
-                                        st.write("Кодовое слово (вектор битов):")
-                                        if len(word) > 50:
-                                            preview = word[:20] + ["..."] + word[-20:]
-                                            indices = list(range(20)) + ["..."] + list(range(len(word)-20, len(word)))
-                                            # Используем индекс для отображения позиции, без отдельной колонки "Позиция"
-                                            df = pd.DataFrame({"Значение": preview}, index=indices)
-                                            st.dataframe(df)  # показывает индекс как первый столбец
-                                        else:
-                                            df = pd.DataFrame({"Значение": word}, index=range(len(word)))
-                                            st.dataframe(df)
-
-                                    elif step.type == "calc":
-                                        # Здесь могут быть синдромы или информация об ошибках
-                                        if "syndromes" in step.payload:
-                                            syndromes = step.payload["syndromes"]
-                                            indices = step.payload.get("syndrome_indices", list(range(1, len(syndromes)+1)))
- 
-                                            st.write("**Синдромы:**")
- 
-                                            # Таблица: S1, S2, ..., S_2t
-                                            syndrome_data = {
-                                                "Синдром": [f"S{j}" for j in indices],
-                                                "Значение": syndromes,
-                                                "Нулевой": ["Да" if s == 0 else "Нет" for s in syndromes],
-                                            }
-                                            st.table(pd.DataFrame(syndrome_data))
- 
-                                            if "formula" in step.payload:
-                                                st.latex(step.payload["formula"])
- 
-                                        if "error_positions" in step.payload:
-                                            err_pos = step.payload["error_positions"]
-                                            if err_pos:
-                                                st.success(f"Исправлены ошибки в позициях: {err_pos}")
-                                            else:
-                                                st.success("Ошибок не обнаружено")
-                                        if "description" in step.payload:
-                                            st.write(step.payload["description"])
-                                            
-                                            
-                                    elif step.type == "bm":
-                                        desc = step.payload.get("description", "")
-                                        st.markdown(desc)
-                                        lp = step.payload.get("locator_poly")
-                                        if lp is not None:
-                                            coeffs_str = ", ".join(map(str, lp))
-                                            st.info(f"Коэффициенты Λ(x): [{coeffs_str}]")
-
-                                    elif step.type == "chien":
-                                        desc = step.payload.get("description", "")
-                                        st.markdown(desc)
-                                        err_pos = step.payload.get("error_positions", [])
-                                        if err_pos:
-                                            st.success(f"Позиции ошибок, найденные поиском Ченя: {err_pos}")
-                                        else:
-                                            st.success("Ошибочных позиций не найдено")
-
-                                    elif step.type == "result":
-                                        if step.payload.get("success", True):
-                                            decoded_msg = step.payload["decoded"]
-                                            st.success("Декодирование завершено успешно!")
-                                            st.markdown(f"**Декодированное сообщение:** `{decoded_msg}`")
-                                            # Сравнение с исходным
-                                            original_msg = ''.join(map(str, message))
-                                            st.markdown(f"**Исходное сообщение:** `{original_msg}`")
-                                            if decoded_msg == original_msg:
-                                                st.success("Сообщение восстановлено корректно!")
-                                            else:
-                                                st.warning("Сообщение восстановлено с ошибкой")
-                                        else:
-                                            st.error(f"Ошибка декодирования: {step.payload.get('description', 'Неизвестная ошибка')}")
-
-                            st.info("Экспорт отчетов для БЧХ кода будет добавлен позже")
-
-    except Exception as e:
-        st.error(f"Ошибка: {e}")
-
 elif mode == "Сверточные коды":
     st.header("Сверточный код")
     
     st.info("""
     **Сверточные коды** - коды с памятью, использующие скользящее окно.
-    Параметры: K - длина кодового ограничения, скорость = k/n.
+    Декодирование выполняется **алгоритмом Витерби**, который находит наиболее вероятный путь на решетчатой диаграмме.
     """)
     
-    # Выбор конфигурации
-    conv_preset = st.selectbox(
-        "Выберите стандартную конфигурацию",
-        ["Пользовательская"] + list(STANDARD_CONVOLUTIONAL_CODES.keys())
+    # Настройки в sidebar - только готовые конфигурации
+    st.sidebar.subheader("Параметры сверточного кода")
+    
+    # Выбор конфигурации из стандартных
+    conv_preset = st.sidebar.selectbox(
+        "Выберите конфигурацию кода",
+        list(STANDARD_CONVOLUTIONAL_CODES.keys())
     )
     
-    if conv_preset != "Пользовательская":
-        config = STANDARD_CONVOLUTIONAL_CODES[conv_preset]
-        constraint_length = config["constraint_length"]
-        rate = config["rate"]
-        generators = config["generators"]
-        st.info(f"Конфигурация: K={constraint_length}, скорость={rate[0]}/{rate[1]}, полиномы={generators}")
-    else:
-        col1, col2 = st.columns(2)
-        with col1:
-            constraint_length = st.number_input("Длина ограничения K", min_value=2, max_value=7, value=3)
-        with col2:
-            rate_num = st.number_input("Числитель скорости", min_value=1, value=1)
-            rate_den = st.number_input("Знаменатель скорости", min_value=2, max_value=4, value=2)
-        rate = (rate_num, rate_den)
-        generators = st.text_input("Порождающие полиномы (восьмеричные)", "7, 5")
-        generators = [int(g.strip()) for g in generators.split(",")]
+    # Получаем параметры выбранной конфигурации
+    config = STANDARD_CONVOLUTIONAL_CODES[conv_preset]
+    constraint_length = config["constraint_length"]
+    rate = config["rate"]
+    generators = config["generators"]
     
-    # Создаем сверточный код
+    # Создаем код
     conv = ConvolutionalCode(constraint_length, rate, generators)
     
-    # Ввод сообщения
-    max_msg_len = 20
-    msg_str = st.text_input(f"Сообщение (до {max_msg_len} бит)", "101010", help="Введите биты (0 и 1)")
+    # Информация о коде в основной области
+    memory = constraint_length - 1
+    num_states = 2 ** memory
     
-    if set(msg_str).issubset({"0", "1"}):
+    # Словарь максимальных исправляемых ошибок для стандартных кодов
+    max_errors_map = {
+        "K=3, R=1/2 (7,5)": 2,
+        "K=3, R=1/3 (7,5,3)": 3,
+        "K=4, R=1/2 (13,17)": 2,
+        "K=5, R=1/2 (23,35)": 3,
+        "K=6, R=1/2 (53,75)": 3,
+        "K=7, R=1/2 (133,171)": 4,
+    }
+    
+    max_errors_limit = max_errors_map.get(conv_preset, 3)
+    
+    st.subheader(f"Код: {conv_preset}")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        st.metric("Скорость", f"{rate[0]}/{rate[1]}")
+    with col2:
+        st.metric("Длина ограничения K", constraint_length)
+    with col3:
+        st.metric("Память (m)", memory)
+    with col4:
+        st.metric("Состояний", num_states)
+    with col5:
+        st.metric("Исправляет ошибок", f"до {max_errors_limit}")
+    
+    # Показываем порождающие полиномы
+    st.write("**Порождающие полиномы (восьмеричные):**", generators)
+    for i, gen in enumerate(generators):
+        mask = conv._octal_to_binary_poly(gen, constraint_length)
+        st.write(f"  g{i}(x) = {gen} (восьм.) → бинарная маска: {mask}")
+    
+    # Ввод сообщения (любой длины)
+    msg_str = st.text_input(
+        "Сообщение (биты, только 0 и 1)", 
+        "101010",
+        help="Введите последовательность битов (0 и 1) любой длины"
+    )
+    
+    # Валидация ввода
+    if msg_str and not set(msg_str).issubset({"0", "1"}):
+        st.warning("Используйте только 0 и 1")
+    elif msg_str:
         message = np.array([int(b) for b in msg_str], dtype=int)
+        
+        # Показываем длину сообщения
+        st.caption(f"Длина сообщения: {len(message)} бит")
         
         # Кодирование
         if st.button("Кодировать", key="conv_encode_btn"):
             with st.spinner("Кодирование..."):
                 encoded = conv.encode(message)
-                st.success(f"Закодированная последовательность: {''.join(map(str, encoded.tolist()))}")
-                st.info(f"Длина сообщения: {len(message)}, длина закодированного: {len(encoded)}")
+                st.success(f"**Закодированная последовательность:**")
+                st.code(''.join(map(str, encoded.tolist())))
+                st.info(f"Длина сообщения: {len(message)} бит → длина кодового слова: {len(encoded)} бит")
                 st.session_state.conv_encoded = encoded
                 st.session_state.conv_message = message
         
-        # Внесение ошибок и декодирование
+        # Если есть закодированное слово
         if st.session_state.get('conv_encoded') is not None:
             encoded = st.session_state.conv_encoded
             
-            # Внесение ошибок
-            error_positions = st.multiselect(
-                "Выберите позиции для внесения ошибок",
-                options=list(range(len(encoded))),
-                default=[]
-            )
+            st.markdown("---")
+            st.subheader("Внесение ошибок")
             
-            decode_method = st.radio("Метод декодирования", ["viterbi", "simplified"])
+            # Выбор режима ввода ошибок (как в RS коде)
+            error_mode = st.radio("Режим ввода ошибок", ["Автоматический", "Ручной"], index=0)
             
-            if st.button("Внести ошибки и декодировать", key="conv_decode_btn"):
-                with st.spinner("Декодирование..."):
-                    # Вносим ошибки
-                    received = encoded.copy()
-                    for pos in error_positions:
-                        if pos < len(received):
-                            received[pos] ^= 1
-                    
-                    st.info(f"Принятая последовательность: {''.join(map(str, received.tolist()))}")
-                    
-                    # Декодируем
-                    decoded, info = conv.decode(received, method=decode_method)
-                    
-                    st.subheader("Результат декодирования")
-                    st.write(f"Декодированное сообщение: {''.join(map(str, decoded.tolist()))}")
-                    st.write(f"Исходное сообщение: {''.join(map(str, message.tolist()))}")
-                    
-                    # Обрезаем до одинаковой длины для сравнения
-                    min_len = min(len(decoded), len(message))
-                    if np.array_equal(decoded[:min_len], message[:min_len]):
-                        st.success("Успешное декодирование!")
-                    else:
-                        st.error("Ошибка декодирования!")
-                    
-                    st.write(f"Метод декодирования: {info['method']}")
+            if error_mode == "Автоматический":
+                max_errors = min(max_errors_limit, len(encoded))
+                num_errors = st.slider("Количество ошибок", 0, max_errors, min(1, max_errors))
+                
+                if st.button("Сгенерировать случайные ошибки", key="random_conv_errors"):
+                    with st.spinner("Генерация ошибок..."):
+                        noisy = encoded.copy()
+                        if num_errors > 0:
+                            error_positions = np.random.choice(len(noisy), size=num_errors, replace=False).tolist()
+                            for pos in error_positions:
+                                noisy[pos] ^= 1
+                        else:
+                            error_positions = []
+                        
+                        st.session_state.conv_noisy = noisy
+                        st.session_state.conv_error_positions = error_positions
+                        st.rerun()
+            
+            else:  # Ручной режим
+                st.write("Введите позиции ошибок через запятую (0-based индексы):")
+                error_input = st.text_input("Позиции ошибок", "0, 5", key="conv_manual_positions")
+                
+                if st.button("Применить ошибки", key="apply_conv_manual_errors"):
+                    try:
+                        error_positions = [int(pos.strip()) for pos in error_input.split(",") if pos.strip()]
+                        
+                        # Проверяем количество ошибок
+                        if len(error_positions) > max_errors_limit:
+                            st.error(f"Слишком много ошибок! Код может исправить только {max_errors_limit} ошибок.")
+                        else:
+                            # Проверяем корректность позиций
+                            invalid_positions = [pos for pos in error_positions if pos < 0 or pos >= len(encoded)]
+                            if invalid_positions:
+                                st.error(f"Некорректные позиции: {invalid_positions}. Допустимый диапазон: 0-{len(encoded)-1}")
+                            else:
+                                with st.spinner("Применение ошибок..."):
+                                    noisy = encoded.copy()
+                                    for pos in error_positions:
+                                        noisy[pos] ^= 1
+                                    
+                                    st.session_state.conv_noisy = noisy
+                                    st.session_state.conv_error_positions = error_positions
+                                    st.success(f"Ошибки применены в позициях: {error_positions}")
+                                    st.rerun()
+                    except ValueError as e:
+                        st.error(f"Ошибка ввода: {e}. Введите корректные числа через запятую")
+            
+            # Показываем искаженное слово
+            if st.session_state.get('conv_noisy') is not None:
+                noisy = st.session_state.conv_noisy
+                error_positions = st.session_state.get('conv_error_positions', [])
+                
+                st.info(f"**Принятое слово:**")
+                
+                # Визуализация с выделением ошибок
+                noisy_list = noisy.tolist()
+                if error_positions:
+                    bits_display = []
+                    for j, bit in enumerate(noisy_list):
+                        if j in error_positions:
+                            bits_display.append(f"**{bit}**")
+                        else:
+                            bits_display.append(str(bit))
+                    st.markdown(" ".join(bits_display))
+                    st.warning(f"Внесены ошибки в позициях: {error_positions}")
+                    st.caption(f"Количество ошибок: {len(error_positions)}")
+                else:
+                    st.code(''.join(map(str, noisy_list)))
+                    st.info("Ошибки не внесены")
+                
+                # Декодирование
+                st.markdown("---")
+                st.subheader("Декодирование")
+                
+                if st.button("Декодировать и показать шаги", key="conv_decode_btn"):
+                    with st.spinner("Декодирование..."):
+                        from app.explain.convolutional_steps import explain_convolutional
+                        
+                        steps, decoded, info = explain_convolutional(noisy, conv)
+                        st.session_state.conv_steps = steps
+                        st.session_state.conv_decoded = decoded
+                        
+                        st.subheader("Пошаговый разбор декодирования")
+                        
+                        for i, step in enumerate(steps):
+                            with st.expander(f"Шаг {i+1}: {step.title}", expanded=(i==0)):
+                                if step.type == "text":
+                                    st.write(step.payload["description"])
+                                
+                                elif step.type == "matrix":
+                                    codeword = step.payload["codeword"]
+                                    if step.payload.get("type") == "received":
+                                        st.write("Принятая последовательность (по блокам):")
+                                    else:
+                                        st.write("Последовательность:")
+                                    
+                                    block_size = conv.rate_den
+                                    blocks = [codeword[j:j+block_size] for j in range(0, min(len(codeword), 100), block_size)]
+                                    
+                                    block_data = []
+                                    for idx, block in enumerate(blocks[:20]):
+                                        block_str = ' '.join(map(str, block))
+                                        block_data.append({"Блок": idx, "Биты": block_str})
+                                    
+                                    if block_data:
+                                        st.table(pd.DataFrame(block_data))
+                                        if len(blocks) > 20:
+                                            st.caption(f"... и еще {len(blocks)-20} блоков")
+                                
+                                elif step.type == "viterbi":
+                                    st.write(step.payload["description"])
+                                    st.info(f"Количество состояний: {step.payload['num_states']}")
+                                    st.info(f"Размер блока: {step.payload['block_size']} бит")
+                                
+                                elif step.type == "result":
+                                    decoded_bits = step.payload["decoded"]
+                                    decoded_str = step.payload["decoded_str"]
+                                    
+                                    st.success(f"**Декодированное сообщение:** {decoded_str}")
+                                    
+                                    # Сравнение с исходным
+                                    original_str = ''.join(map(str, st.session_state.conv_message))
+                                    st.write(f"**Исходное сообщение:** {original_str}")
+                                    
+                                    if decoded_str == original_str:
+                                        st.success("Сообщение восстановлено корректно!")
+                                    else:
+                                        st.error("Ошибка декодирования!")
+                                        
+                                        # Показываем сравнение по битам
+                                        st.write("**Сравнение бит:**")
+                                        comp_parts = []
+                                        max_len = max(len(decoded_str), len(original_str))
+                                        for j in range(max_len):
+                                            if j < len(original_str) and j < len(decoded_str):
+                                                if decoded_str[j] == original_str[j]:
+                                                    comp_parts.append(decoded_str[j])
+                                                else:
+                                                    comp_parts.append(f"**{original_str[j]}→{decoded_str[j]}**")
+                                            elif j < len(original_str):
+                                                comp_parts.append(f"**{original_str[j]}→?**")
+                                            else:
+                                                comp_parts.append(f"**?→{decoded_str[j]}**")
+                                        
+                                        for j in range(0, len(comp_parts), 20):
+                                            st.text(" ".join(comp_parts[j:j+20]))
+                                    
+                                    st.info(f"Финальная метрика пути: {step.payload.get('final_metric', 0)}")
+                        
+                        st.success("Декодирование завершено!")
     
-    else:
-        if msg_str:
-            st.warning("Используйте только 0 и 1")
+    # Кнопка сброса
+    if st.button("Сбросить", key="conv_reset_btn"):
+        st.session_state.conv_encoded = None
+        st.session_state.conv_noisy = None
+        st.session_state.conv_message = None
+        st.session_state.conv_error_positions = None
+        st.session_state.conv_steps = None
+        st.session_state.conv_decoded = None
+        st.cache_data.clear()
+        st.rerun()
