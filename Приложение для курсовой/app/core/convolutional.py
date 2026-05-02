@@ -40,7 +40,9 @@ class ConvolutionalCode:
 
     def _octal_to_binary_poly(self, octal, length):
         """Восьмеричное число → бинарный вектор длины length (MSB first)."""
-        binary = [int(b) for b in bin(octal)[2:]]
+        # int(str(octal), 8) – интерпретирует строку "13" как восьмеричное число
+        value = int(str(octal), 8)
+        binary = [int(b) for b in bin(value)[2:]]
         while len(binary) < length:
             binary.insert(0, 0)
         return binary[-length:]

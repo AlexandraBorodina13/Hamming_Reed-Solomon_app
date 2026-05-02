@@ -815,6 +815,16 @@ elif mode == "Сверточные коды":
                         st.session_state.conv_steps = steps
                         st.session_state.conv_decoded = decoded
                         
+                        
+                    
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
                         st.subheader("Пошаговый разбор декодирования")
                         
                         for i, step in enumerate(steps):
