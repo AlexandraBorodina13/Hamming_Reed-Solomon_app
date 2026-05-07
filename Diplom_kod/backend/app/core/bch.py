@@ -1,6 +1,6 @@
 import numpy as np
 import galois
-import streamlit as st
+#import streamlit as st
 
 
 class BCHCode:

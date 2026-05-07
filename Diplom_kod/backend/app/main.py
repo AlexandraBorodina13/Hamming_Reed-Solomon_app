@@ -1,22 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import hamming
+from app.api import hamming, bch, reed_solomon, convolutional
 
 app = FastAPI(
     title="Coding Playground API",
     description="API для кодирования и декодирования данных",
-    version="0.1.0"
+    version="1.0.0"
 )
 
-# CORS (пока разрешаем все origins для разработки)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Для разработки, позже ограничить
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(hamming.router)
+app.include_router(bch.router)
+app.include_router(reed_solomon.router)
+app.include_router(convolutional.router)
 
 @app.get("/")
 def root():

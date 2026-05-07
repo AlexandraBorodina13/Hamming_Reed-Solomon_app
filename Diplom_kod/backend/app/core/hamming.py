@@ -38,7 +38,6 @@ def hamming_general_matrices(m):
     return G, H, n, k
 
 def encode_general(message_bits, m):
-    """Кодирование для обобщенного кода Хэмминга"""
     G, _, n, k = hamming_general_matrices(m)
     if len(message_bits) != k:
         raise ValueError(f"Длина сообщения должна быть {k} бит")

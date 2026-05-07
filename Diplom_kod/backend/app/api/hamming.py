@@ -7,10 +7,7 @@ router = APIRouter(prefix="/hamming", tags=["Hamming"])
 
 @router.post("/encode", response_model=EncodeResponse)
 def encode(req: HammingEncodeRequest):
-    result = HammingService.encode(req.m, req.message)
-    n = 2**req.m - 1
-    k = n - req.m
-    return EncodeResponse(codeword=result["codeword"], params={"n": n, "k": k, "m": req.m})
+    return HammingService.encode(req.m, req.message)
 
 @router.post("/decode", response_model=DecodeResponse)
 def decode(req: HammingDecodeRequest):
