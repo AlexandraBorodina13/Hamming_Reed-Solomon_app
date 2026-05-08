@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 from app.core.hamming import encode_general, decode_general
 from app.explain.hamming_steps import explain_hamming_general
-from app.core.bch import get_bch_code
+from app.core.bch import get_bch_code, BCH_PRESETS
 from app.explain.bch_steps import explain_bch
 from app.core.reed_solomon import rs_make, rs_encode_bytes, rs_decode_symbols, rs_add_errors, RS_PRESETS
 from app.explain.rs_steps import explain_rs
@@ -75,7 +75,9 @@ class HammingService:
 # --- БЧХ ---
 class BCHService:
     @staticmethod
-    def encode(n: int, k: int, message: str) -> EncodeResponse:
+    def encode(preset: str, message: str) -> EncodeResponse:
+        params = BCH_PRESETS[preset]
+        n, k = params["n"], params["k"]
         bits = np.array([int(b) for b in message], dtype=int)
         try:
             codec = get_bch_code(n, k)
@@ -88,23 +90,22 @@ class BCHService:
         )
 
     @staticmethod
-    def decode(n: int, k: int, received: str) -> DecodeResponse:
+    def decode(preset: str, received: str) -> DecodeResponse:
+        params = BCH_PRESETS[preset]
+        n, k = params["n"], params["k"]
         bits = np.array([int(b) for b in received], dtype=int)
         try:
             codec = get_bch_code(n, k)
         except Exception as e:
             raise HTTPException(status_code=422, detail=f"Невозможно создать BCH({n},{k}): {e}")
-
         try:
             decoded, info = codec.decode(bits)
             steps = explain_bch(bits, codec)
         except Exception as e:
             raise HTTPException(status_code=422, detail=f"Ошибка декодирования BCH: {str(e)}")
-
         return DecodeResponse(
             decoded="".join(map(str, decoded)),
             success=info.get("success", False),
-            # ВАЖНО: сериализуем payload каждого шага
             steps=[StepDTO(type=s.type, title=s.title, payload=_make_serializable(s.payload)) for s in steps],
             error_positions=info.get("error_positions", [])
         )

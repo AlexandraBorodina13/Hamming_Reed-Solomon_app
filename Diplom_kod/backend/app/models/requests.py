@@ -39,33 +39,53 @@ class HammingDecodeRequest(BaseModel):
 
 # --- БЧХ ---
 class BCHEncodeRequest(BaseModel):
-    n: int = Field(description="Длина кодового слова (7,15,31,63)")
-    k: int = Field(description="Число информационных бит")
+    preset: str = Field(description="Название пресета БЧХ")
     message: str
+
+    @field_validator('preset')
+    @classmethod
+    def check_preset(cls, v):
+        from app.core.bch import BCH_PRESETS   # локальный импорт, чтобы избежать циклической зависимости
+        if v not in BCH_PRESETS:
+            raise ValueError(f'Неизвестный пресет: {v}')
+        return v
 
     @field_validator('message')
     @classmethod
-    def check_length_bch(cls, v, info):
-        k = info.data.get('k')
-        if k is not None and len(v) != k:
-            raise ValueError(f'Длина сообщения должна быть {k} бит')
+    def check_message(cls, v, info):
         if not set(v).issubset({'0','1'}):
-            raise ValueError('Только 0 и 1')
+            raise ValueError('Сообщение должно содержать только 0 и 1')
+        preset = info.data.get('preset')
+        if preset:
+            from app.core.bch import BCH_PRESETS
+            k = BCH_PRESETS[preset]['k']
+            if len(v) != k:
+                raise ValueError(f'Длина сообщения должна быть {k} бит (сейчас {len(v)})')
         return v
 
 class BCHDecodeRequest(BaseModel):
-    n: int
-    k: int
+    preset: str
     received: str
+
+    @field_validator('preset')
+    @classmethod
+    def check_preset_decode(cls, v):
+        from app.core.bch import BCH_PRESETS
+        if v not in BCH_PRESETS:
+            raise ValueError(f'Неизвестный пресет: {v}')
+        return v
 
     @field_validator('received')
     @classmethod
-    def check_length_bch_decode(cls, v, info):
-        n = info.data.get('n')
-        if n is not None and len(v) != n:
-            raise ValueError(f'Длина принятого слова должна быть {n} бит')
+    def check_received(cls, v, info):
         if not set(v).issubset({'0','1'}):
-            raise ValueError('Только 0 и 1')
+            raise ValueError('Принятое слово должно содержать только 0 и 1')
+        preset = info.data.get('preset')
+        if preset:
+            from app.core.bch import BCH_PRESETS
+            n = BCH_PRESETS[preset]['n']
+            if len(v) != n:
+                raise ValueError(f'Длина принятого слова должна быть {n} бит (сейчас {len(v)})')
         return v
 
 # --- Рид-Соломон ---

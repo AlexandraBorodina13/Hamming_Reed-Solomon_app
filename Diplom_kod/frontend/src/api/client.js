@@ -14,11 +14,11 @@ export const decodeHamming = (m, received) =>
   api.post('/hamming/decode', { m, received });
 
 // ===================== БЧХ =====================
-export const encodeBCH = (n, k, message) =>
-  api.post('/bch/encode', { n, k, message });
+export const encodeBCH = (preset, message) =>
+  api.post('/bch/encode', { preset, message });
 
-export const decodeBCH = (n, k, received) =>
-  api.post('/bch/decode', { n, k, received });
+export const decodeBCH = (preset, received) =>
+  api.post('/bch/decode', { preset, received });
 
 // ===================== Рид-Соломон =====================
 export const encodeRS = (preset, message) =>

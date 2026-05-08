@@ -7,8 +7,8 @@ router = APIRouter(prefix="/bch", tags=["BCH"])
 
 @router.post("/encode", response_model=EncodeResponse)
 def encode(req: BCHEncodeRequest):
-    return BCHService.encode(req.n, req.k, req.message)
+    return BCHService.encode(req.preset, req.message)
 
 @router.post("/decode", response_model=DecodeResponse)
 def decode(req: BCHDecodeRequest):
-    return BCHService.decode(req.n, req.k, req.received)
+    return BCHService.decode(req.preset, req.received)

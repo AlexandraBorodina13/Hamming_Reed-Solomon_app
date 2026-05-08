@@ -11,20 +11,17 @@ const RS_PRESETS = {
 };
 
 export default function ReedSolomon() {
-  // === Параметры ===
   const [preset, setPreset] = useState("RS(255,223) – GF(2^8), t=16");
   const params = RS_PRESETS[preset];
   const { n, k, t } = params;
 
-  // === Поля ввода ===
   const [message, setMessage] = useState('Hello RS!');
   const [errorMode, setErrorMode] = useState('manual');
   const [manualPositions, setManualPositions] = useState('');
   const [manualMagnitudes, setManualMagnitudes] = useState('');
   const [numAutoErrors, setNumAutoErrors] = useState(1);
 
-  // === Состояния процесса ===
-  const [codeword, setCodeword] = useState(null);   // массив чисел
+  const [codeword, setCodeword] = useState(null);
   const [noisy, setNoisy] = useState(null);
   const [errorPositions, setErrorPositions] = useState([]);
   const [decodeResult, setDecodeResult] = useState(null);
@@ -33,10 +30,9 @@ export default function ReedSolomon() {
   const [errorMsg, setErrorMsg] = useState('');
   const [positionError, setPositionError] = useState('');
 
-  const [phase, setPhase] = useState('input');  // input|encoded|noisy|decoding|decoded
+  const [phase, setPhase] = useState('input');
   const pollRef = useRef(null);
 
-  // Сброс всего, кроме параметров
   const resetAll = () => {
     if (pollRef.current) clearTimeout(pollRef.current);
     setPhase('input');
@@ -49,7 +45,6 @@ export default function ReedSolomon() {
     setPositionError('');
   };
 
-  // При смене пресета сбрасываем процесс
   useEffect(() => {
     resetAll();
   }, [preset]);
@@ -63,13 +58,11 @@ export default function ReedSolomon() {
     return err.message || 'Неизвестная ошибка';
   };
 
-  // ============ ОБРАБОТЧИКИ ============
   const handleEncode = async () => {
     setErrorMsg('');
     setLoading(true);
     try {
       const res = await encodeRS(preset, message);
-      // ответ: { codeword: "числа,через,запятую", params: ... }
       setCodeword(res.data.codeword.split(',').map(Number));
       setPhase('encoded');
     } catch (err) {
@@ -97,6 +90,10 @@ export default function ReedSolomon() {
         setPositionError(`Позиции должны быть от 0 до ${n - 1}`);
         return;
       }
+      if (posArray.length > t) {
+        setPositionError(`Слишком много ошибок! Код может исправить не более ${t}.`);
+        return;
+      }
 
       let magArray = null;
       if (manualMagnitudes.trim()) {
@@ -122,6 +119,10 @@ export default function ReedSolomon() {
       setErrorPositions(posArray);
     } else {
       // Автоматический режим
+      if (numAutoErrors > t) {
+        setPositionError(`Слишком много ошибок! Максимум: ${t}`);
+        return;
+      }
       const count = Math.min(numAutoErrors, n);
       const positions = [];
       const used = new Set();
@@ -180,14 +181,13 @@ export default function ReedSolomon() {
     }
   };
 
-  // ============ РЕНДЕР ============
   return (
     <div className="container mt-4">
       <div className="card shadow-sm">
         <div className="card-body">
           <h2 className="card-title text-center">Код Рида–Соломона</h2>
 
-          {/* БЛОК ВЫБОРА ПРЕСЕТА */}
+          {/* ВЫБОР ПРЕСЕТА */}
           <div className="row mb-3 d-flex justify-content-center">
             <div className="col-md-4">
               <label className="form-label">Конфигурация кода</label>
@@ -206,7 +206,7 @@ export default function ReedSolomon() {
             </div>
           </div>
 
-          {/* === ФАЗА 1: КОДИРОВАНИЕ === */}
+          {/* ФАЗА 1: КОДИРОВАНИЕ */}
           <div className="mb-4 p-3 border rounded bg-light">
             <h5>1. Кодирование</h5>
             <textarea
@@ -230,7 +230,7 @@ export default function ReedSolomon() {
             </button>
           </div>
 
-          {/* === ФАЗА 2: ВНЕСЕНИЕ ОШИБОК === */}
+          {/* ФАЗА 2: ВНЕСЕНИЕ ОШИБОК */}
           {phase !== 'input' && (
             <div className="mb-4 p-3 border rounded bg-light">
               <h5>2. Внесение ошибок</h5>
@@ -295,10 +295,11 @@ export default function ReedSolomon() {
                       className="form-control"
                       type="number"
                       min="0"
-                      max={Math.floor((n - k) / 2)}
+                      max={t}
                       value={numAutoErrors}
                       onChange={e => setNumAutoErrors(Number(e.target.value))}
                     />
+                    <div className="form-text">Максимум: {t}</div>
                   </div>
                 </div>
               )}
@@ -315,7 +316,7 @@ export default function ReedSolomon() {
             </div>
           )}
 
-          {/* === ФАЗА 3: ДЕКОДИРОВАНИЕ === */}
+          {/* ФАЗА 3: ДЕКОДИРОВАНИЕ */}
           {phase === 'noisy' && (
             <div className="mb-4 p-3 border rounded bg-light">
               <h5>3. Декодирование</h5>
@@ -329,7 +330,6 @@ export default function ReedSolomon() {
             </div>
           )}
 
-          {/* ФАЗА ОЖИДАНИЯ */}
           {phase === 'decoding' && (
             <div className="mb-4 p-3 border rounded bg-light text-center">
               <div className="spinner-border text-primary" role="status">
@@ -339,7 +339,7 @@ export default function ReedSolomon() {
             </div>
           )}
 
-          {/* === ФАЗА 4: РЕЗУЛЬТАТ === */}
+          {/* ФАЗА 4: РЕЗУЛЬТАТ */}
           {phase === 'decoded' && decodeResult && (
             <div className="mb-4 p-3 border rounded bg-light">
               <h5>4. Результат</h5>
@@ -356,10 +356,8 @@ export default function ReedSolomon() {
             </div>
           )}
 
-          {/* ОШИБКИ */}
           {errorMsg && <div className="alert alert-danger">{errorMsg}</div>}
 
-          {/* КНОПКА СБРОСА */}
           {phase !== 'input' && (
             <button className="btn btn-outline-danger mt-2" onClick={resetAll}>
               Сбросить всё
