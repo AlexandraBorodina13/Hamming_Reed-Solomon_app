@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Any
+from typing import Any, Optional
 
 class StepDTO(BaseModel):
     type: str
@@ -9,6 +9,7 @@ class StepDTO(BaseModel):
 class EncodeResponse(BaseModel):
     codeword: str
     params: dict[str, Any]
+    steps: Optional[list[StepDTO]] = None
 
 class DecodeResponse(BaseModel):
     decoded: str

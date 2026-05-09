@@ -1,4 +1,3 @@
-from .channels import bsc_flip
 from .export_utils import create_pdf_report, generate_html_report
 from .hamming import (
     hamming74_matrices, encode, decode, syndrome,
@@ -8,5 +7,4 @@ from .hamming import *
 from .reed_solomon import *
 from .bch import BCHCode, get_bch_code
 from .convolutional import ConvolutionalCode, STANDARD_CONVOLUTIONAL_CODES
-from .channels import bsc_flip
 from .export_utils import *

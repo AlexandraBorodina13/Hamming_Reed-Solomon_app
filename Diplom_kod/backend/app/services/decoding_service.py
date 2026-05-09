@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from app.core.hamming import encode_general, decode_general
-from app.explain.hamming_steps import explain_hamming_general
+from app.explain.hamming_steps import explain_hamming_general, explain_hamming_encode
 from app.core.bch import get_bch_code, BCH_PRESETS
 from app.explain.bch_steps import explain_bch
 from app.core.reed_solomon import rs_make, rs_encode_bytes, rs_decode_symbols, rs_add_errors, RS_PRESETS
@@ -16,12 +16,16 @@ from app.models.responses import DecodeResponse, StepDTO, EncodeResponse
 from app.core.hamming import info_positions
 
 def _make_serializable(obj):
-    """Рекурсивно преобразует numpy.ndarray в list для JSON-совместимости."""
+    """Рекурсивно преобразует numpy-типы в JSON-совместимые."""
     if isinstance(obj, np.ndarray):
         return obj.tolist()
-    elif isinstance(obj, dict):
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, dict):
         return {k: _make_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
+    if isinstance(obj, list):
         return [_make_serializable(v) for v in obj]
     return obj
 
@@ -44,9 +48,12 @@ class HammingService:
             raise HTTPException(status_code=422, detail=str(e))
         n = 2**m - 1
         k = n - m
+        # Генерация шагов кодирования
+        steps = explain_hamming_encode(m, bits)
         return EncodeResponse(
             codeword="".join(map(str, codeword)),
-            params={"n": n, "k": k, "m": m}
+            params={"n": n, "k": k, "m": m},
+            steps=[StepDTO(type=s.type, title=s.title, payload=_make_serializable(s.payload)) for s in steps]
         )
 
     @staticmethod

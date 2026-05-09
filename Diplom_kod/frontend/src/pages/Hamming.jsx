@@ -22,6 +22,8 @@ export default function Hamming() {
   const [errorMsg, setErrorMsg] = useState('');
   const [positionError, setPositionError] = useState('');
 
+  const [encodeSteps, setEncodeSteps] = useState(null);
+
   // === Фазы процесса ===
   // 'input' – только ввод сообщения (начало)
   // 'encoded' – сообщение закодировано, показываем кодовое слово и блок внесения ошибок
@@ -37,7 +39,8 @@ export default function Hamming() {
     try {
       const res = await encodeHamming(m, message);
       setCodeword(res.data.codeword);
-      setPhase('encoded');   // переходим к внесению ошибок
+      setEncodeSteps(res.data.steps || null);     // сохраняем шаги
+      setPhase('encoded');
     } catch (err) {
       setErrorMsg(extractError(err));
     }
@@ -120,31 +123,51 @@ export default function Hamming() {
             </div>
           </div>
 
-          {/* === ФАЗА 1: ВВОД И КОДИРОВАНИЕ === */}
-          <div className="mb-4 p-3 border rounded bg-light">
-            <h5>1. Кодирование</h5>
-            <input
-              className="form-control mb-2"
-              placeholder="Введите сообщение"
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-            />
-            <button
-              className="btn btn-success"
-              onClick={handleEncode}
-              disabled={loading || message.length !== k}
-            >
-              {loading ? 'Кодируем...' : 'Закодировать'}
-            </button>
+          {/* Идея кодирования — статичное пояснение */}
+          <div className="mb-4 p-3 border rounded bg-light text-start">
+            <h5>Идея кодирования</h5>
+            <p>Код Хэмминга – линейный блочный код. Из <strong>k</strong> информационных битов образуется <strong>n</strong> битов кодового слова. Добавляются <strong>m</strong> (n-k) проверочных бита так, чтобы для любого кодового слова <strong>c</strong> выполнялось равенство:</p>
+            <p className="text-center"><strong>H·c<sup>T</sup> = 0 (mod 2)</strong>,</p>
+            <p>где <strong>H</strong> – проверочная матрица m×n, столбцы которой – все ненулевые m-битные векторы.</p>
+            <p>Проверочные биты размещаются на <strong>позициях, которые являются степенями двойки</strong> (при 1-индексации: 1,2,4). В 0-индексации это позиции 0,1,3. Информационные биты – на остальных позициях (2,4,5,6). Такое размещение делает код <strong>систематическим</strong>: первые проверочные, потом информационные, но с пропуском позиции 3 для третьего проверочного.</p>
           </div>
+
+          {/* === ФАЗА 1: ВВОД И КОДИРОВАНИЕ === */}
+            <div className="mb-4 p-3 border rounded bg-light">
+              <h5>1. Кодирование</h5>
+              <input
+                className="form-control mb-2"
+                placeholder="Введите сообщение"
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+              />
+              <button
+                className="btn btn-success"
+                onClick={handleEncode}
+                disabled={loading || message.length !== k}
+                >
+                {loading ? 'Кодируем...' : 'Закодировать'}
+              </button>
+
+              {/* Результат кодирования и шаги (появляются только после успешного кодирования) */}
+              {codeword && (
+                <>
+                  <div className="alert alert-success mt-3">
+                  Кодовое слово: <strong>{codeword}</strong>
+                </div>
+                  {encodeSteps && (
+                    <div className="text-start mt-3">
+                      <StepVisualizer steps={encodeSteps} />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
 
           {/* === ФАЗА 2: ВНЕСЕНИЕ ОШИБОК === */}
           {phase !== 'input' && (
             <div className="mb-4 p-3 border rounded bg-light">
               <h5>2. Внесение ошибок</h5>
-              <div className="alert alert-success">
-                Кодовое слово: <strong>{codeword}</strong>
-              </div>
               <div className="mb-2">
                 <div className="form-check form-check-inline">
                   <input
