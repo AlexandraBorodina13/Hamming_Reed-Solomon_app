@@ -92,14 +92,7 @@ class BCHCode:
             }
             
             
-    def _berlekamp_massey(self, syndromes):
-        """
-        Реализация алгоритма Берлекэмпа–Месси для нахождения полинома локаторов ошибок.
-    
-        Вход: список синдромов [S1, S2, ..., S2t]
-        Выход: список коэффициентов полинома Λ(x) = [λ0, λ1, ..., λv]
-            где λ0 = 1, а v — количество ошибок
-        """
+    """def _berlekamp_massey(self, syndromes):
         #GF = self.field
         
         GF = self.GF
@@ -149,8 +142,65 @@ class BCHCode:
             factor = Lambda[0]
             Lambda = [c / factor for c in Lambda]
     
-        return [int(c) for c in Lambda]
+        return [int(c) for c in Lambda]"""
+        
+    def _berlekamp_massey(self, syndromes):
+        """
+        Реализация алгоритма Берлекэмпа-Месси для нахождения полинома локаторов ошибок.
+        Возвращает список коэффициентов Λ(x) = [λ0, λ1, ..., λv] (λ0 = 1).
+        Работает в поле GF(2^m).
+        """
+        GF = self.GF
+        t = self.t
 
+        # Преобразуем синдромы в элементы поля GF
+        S = [GF(s) if s != 0 else GF(0) for s in syndromes]
+
+        # Инициализация
+        Lambda = [GF(1)]      # Λ(x) = 1
+        B = [GF(1)]          # B(x) = 1
+        L = 0
+        m = 1
+
+        for r in range(1, len(S) + 1):
+            # Вычисляем невязку Δ
+            delta = S[r-1]
+            for j in range(1, L+1):
+                if j < len(Lambda):
+                    delta += Lambda[j] * S[r-1-j]
+
+            if delta == 0:
+                m += 1
+            else:
+                # Сохраняем старый Λ
+                T = Lambda.copy()
+
+                # Удлиняем Λ, если нужно, до размера max(len(Lambda), len(B)+m)
+                while len(Lambda) < len(B) + m:
+                    Lambda.append(GF(0))
+                for i in range(len(B)):
+                    if i + m < len(Lambda):
+                        # Lambda[i+m] -= delta * B[i]
+                        Lambda[i+m] -= delta * B[i]
+
+                if 2 * L <= r - 1:
+                    L = r - L
+                    B = T.copy()
+                    m = 1
+                else:
+                    m += 1
+
+        # Нормализация: делим все коэффициенты на λ0 (он должен быть 1, но на всякий случай)
+        if Lambda[0] != 1:
+            inv_l0 = 1 / Lambda[0]   # в поле GF
+            Lambda = [c * inv_l0 for c in Lambda]
+            
+        # Обрезаем хвостовые нули (но λ0 всегда 1)
+        while len(Lambda) > 1 and Lambda[-1] == 0:
+            Lambda.pop()
+
+        # Возвращаем список целых чисел
+        return [int(c) for c in Lambda]
 
 def get_bch_code(n, k):
     return BCHCode(n, k)

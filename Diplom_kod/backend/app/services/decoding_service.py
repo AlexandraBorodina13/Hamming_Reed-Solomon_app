@@ -7,7 +7,8 @@ from typing import Dict, Any
 from app.core.hamming import encode_general, decode_general
 from app.explain.hamming_steps import explain_hamming_general, explain_hamming_encode
 from app.core.bch import get_bch_code, BCH_PRESETS
-from app.explain.bch_steps import explain_bch
+#from app.explain.bch_steps import explain_bch, explain_bch_encode
+from app.explain.bch_steps import explain_bch_encode, explain_bch_decode
 from app.core.reed_solomon import rs_make, rs_encode_bytes, rs_decode_symbols, rs_add_errors, RS_PRESETS
 from app.explain.rs_steps import explain_rs
 from app.core.convolutional import ConvolutionalCode, STANDARD_CONVOLUTIONAL_CODES
@@ -86,14 +87,13 @@ class BCHService:
         params = BCH_PRESETS[preset]
         n, k = params["n"], params["k"]
         bits = np.array([int(b) for b in message], dtype=int)
-        try:
-            codec = get_bch_code(n, k)
-            codeword = codec.encode(bits)
-        except Exception as e:
-            raise HTTPException(status_code=422, detail=f"Ошибка BCH: {e}")
+        codec = get_bch_code(n, k)
+        codeword = codec.encode(bits)
+        steps = explain_bch_encode(codec, bits)
         return EncodeResponse(
             codeword="".join(map(str, codeword)),
-            params={"n": n, "k": k, "t": codec.t}
+            params={"n": n, "k": k, "t": codec.t},
+            steps=[StepDTO(type=s.type, title=s.title, payload=_make_serializable(s.payload)) for s in steps]
         )
 
     @staticmethod
@@ -101,15 +101,9 @@ class BCHService:
         params = BCH_PRESETS[preset]
         n, k = params["n"], params["k"]
         bits = np.array([int(b) for b in received], dtype=int)
-        try:
-            codec = get_bch_code(n, k)
-        except Exception as e:
-            raise HTTPException(status_code=422, detail=f"Невозможно создать BCH({n},{k}): {e}")
-        try:
-            decoded, info = codec.decode(bits)
-            steps = explain_bch(bits, codec)
-        except Exception as e:
-            raise HTTPException(status_code=422, detail=f"Ошибка декодирования BCH: {str(e)}")
+        codec = get_bch_code(n, k)
+        decoded, info = codec.decode(bits)
+        steps = explain_bch_decode(bits, codec)   # <-- заменили на новую функцию
         return DecodeResponse(
             decoded="".join(map(str, decoded)),
             success=info.get("success", False),

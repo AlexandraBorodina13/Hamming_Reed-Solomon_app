@@ -40,7 +40,7 @@ export default function BCH() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [positionError, setPositionError] = useState('');
-
+  const [encodeSteps, setEncodeSteps] = useState(null);
   const [phase, setPhase] = useState('input');
 
   useEffect(() => {
@@ -53,6 +53,7 @@ export default function BCH() {
     setNoisy(null);
     setDecodeResult(null);
     setSteps(null);
+    setEncodeSteps(null);
     setErrorMsg('');
     setPositionError('');
   };
@@ -72,6 +73,7 @@ export default function BCH() {
     try {
       const res = await encodeBCH(preset, message);
       setCodeword(res.data.codeword);
+      setEncodeSteps(res.data.steps || null);   // <-- сохраняем шаги
       setPhase('encoded');
     } catch (err) {
       setErrorMsg(extractError(err));
@@ -186,6 +188,20 @@ const handleIntroduceError = () => {
             >
               {loading ? 'Кодируем...' : 'Закодировать'}
             </button>
+
+            {/* Результат кодирования и шаги */}
+            {codeword && (
+              <>
+               <div className="alert alert-success mt-3">
+                  Кодовое слово: <strong>{codeword}</strong>
+                </div>
+                {encodeSteps && (
+                 <div className="text-start mt-3">
+                    <StepVisualizer steps={encodeSteps} />
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* 2. Внесение ошибок */}

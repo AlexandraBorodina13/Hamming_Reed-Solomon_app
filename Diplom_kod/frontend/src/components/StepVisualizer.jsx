@@ -10,7 +10,18 @@ export default function StepVisualizer({ steps }) {
     <div>
       {steps.map((step, index) => (
         <details key={index} open>
-          <summary><strong>Шаг {index + 1}: {step.title}</strong></summary>
+          <summary>
+            <strong>
+              Шаг {index + 1}:{' '}
+              <ReactMarkdown
+                remarkPlugins={[remarkMath]}
+                rehypePlugins={[rehypeKatex]}
+                components={{ p: ({ children }) => <>{children}</> }}
+              >
+                {step.title}
+              </ReactMarkdown>
+            </strong>
+          </summary>
           <div style={{ marginLeft: 20, marginTop: 10 }}>
 
             {/* Текст */}
