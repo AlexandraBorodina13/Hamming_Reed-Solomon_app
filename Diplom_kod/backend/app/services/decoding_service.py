@@ -10,7 +10,7 @@ from app.core.bch import get_bch_code, BCH_PRESETS
 #from app.explain.bch_steps import explain_bch, explain_bch_encode
 from app.explain.bch_steps import explain_bch_encode, explain_bch_decode
 from app.core.reed_solomon import rs_make, rs_encode_bytes, rs_decode_symbols, rs_add_errors, RS_PRESETS
-from app.explain.rs_steps import explain_rs
+from app.explain.rs_steps import explain_rs_decode, explain_rs_encode
 from app.core.convolutional import ConvolutionalCode, STANDARD_CONVOLUTIONAL_CODES
 from app.explain.convolutional_steps import explain_convolutional
 from app.models.responses import DecodeResponse, StepDTO, EncodeResponse
@@ -18,6 +18,10 @@ from app.core.hamming import info_positions
 
 def _make_serializable(obj):
     """Рекурсивно преобразует numpy-типы в JSON-совместимые."""
+    if isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
     if isinstance(obj, np.ndarray):
         return obj.tolist()
     if isinstance(obj, np.integer):
@@ -115,35 +119,36 @@ class BCHService:
 class RSService:
     @staticmethod
     def encode(preset: str, message: str) -> EncodeResponse:
+        from app.explain.rs_steps import explain_rs_encode
         params = RS_PRESETS[preset]
         n, k, m, t = params["n"], params["k"], params["m"], params["t"]
         try:
             GF, RS = rs_make(n, k, m)
         except Exception as e:
             raise HTTPException(status_code=422, detail=f"Ошибка создания RS кода: {e}")
-        msg_bytes = message.encode("utf-8")[:k]
-        msg_bytes = msg_bytes.ljust(k, b'\0')
+
         try:
-            codeword = rs_encode_bytes(msg_bytes, RS)
+            encode_steps, codeword_list = explain_rs_encode(message, n, k, m)
         except Exception as e:
             raise HTTPException(status_code=422, detail=f"Ошибка кодирования RS: {e}")
+
         return EncodeResponse(
-            codeword=",".join(map(str, codeword)),
-            params={"n": n, "k": k, "m": m, "t": t}
+            codeword=",".join(map(str, codeword_list)),
+            params={"n": n, "k": k, "m": m, "t": t},
+            steps=[StepDTO(type=s.type, title=s.title,
+                           payload=_make_serializable(s.payload)) for s in encode_steps]
         )
 
     @staticmethod
     def decode_async(preset: str, received: str) -> str:
         task_id = str(uuid.uuid4())
-        tasks_db[task_id] = {"status": "pending", "result": None, "steps": None}
-        # Параметры получим внутри perform_decode
-        # Сохраним preset в задаче
-        tasks_db[task_id]["preset"] = preset
-        tasks_db[task_id]["received"] = received
+        tasks_db[task_id] = {"status": "pending", "result": None, "steps": None,
+                             "preset": preset, "received": received}
         return task_id
 
     @staticmethod
     def perform_decode(task_id: str, preset: str, received: str):
+        from app.explain.rs_steps import explain_rs_decode
         params = RS_PRESETS[preset]
         n, k, m, t = params["n"], params["k"], params["m"], params["t"]
         try:
@@ -151,21 +156,29 @@ class RSService:
         except Exception as e:
             tasks_db[task_id] = {"status": "error", "detail": str(e)}
             return
-        received_list = [int(x.strip()) for x in received.split(",") if x.strip() != ""]
-        codeword = np.array(received_list, dtype=int)
-        steps = explain_rs(codeword, RS)
-        try:
-            decoded_symbols = rs_decode_symbols(codeword, RS)
-            decoded_bytes = decoded_symbols[:k].tobytes()
-            decoded_text = decoded_bytes.decode("latin-1").rstrip("\x00")
-            decoded_text = "".join(chr(b) for b in decoded_bytes if 32 <= b < 127)
-        except Exception as e:
-            tasks_db[task_id] = {"status": "error", "detail": str(e)}
+
+        received_list = [int(x.strip()) for x in received.split(",") if x.strip()]
+        if len(received_list) != n:
+            tasks_db[task_id] = {
+                "status": "error",
+                "detail": f"Длина принятого слова должна быть {n}, получено {len(received_list)}"
+            }
             return
+
+        try:
+            steps, decoded_text, success = explain_rs_decode(received_list, n, k, m)
+        except Exception as e:
+            tasks_db[task_id] = {"status": "error", "detail": f"Ошибка декодирования: {e}"}
+            return
+
         tasks_db[task_id] = {
             "status": "done",
-            "result": {"decoded": decoded_text},
-            "steps": [StepDTO(type=s.type, title=s.title, payload=_make_serializable(s.payload)).dict() for s in steps]
+            "result": {"decoded": decoded_text, "success": success},
+            "steps": [
+                StepDTO(type=s.type, title=s.title,
+                        payload=_make_serializable(s.payload)).dict()
+                for s in steps
+            ]
         }
 
 # --- Свёрточный код ---

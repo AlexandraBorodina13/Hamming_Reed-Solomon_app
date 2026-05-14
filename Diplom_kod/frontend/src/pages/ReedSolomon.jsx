@@ -27,6 +27,7 @@ export default function ReedSolomon() {
   const [decodeResult, setDecodeResult] = useState(null);
   const [steps, setSteps] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [encodeSteps, setEncodeSteps] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [positionError, setPositionError] = useState('');
 
@@ -43,6 +44,7 @@ export default function ReedSolomon() {
     setSteps(null);
     setErrorMsg('');
     setPositionError('');
+    setEncodeSteps(null); 
   };
 
   useEffect(() => {
@@ -64,6 +66,7 @@ export default function ReedSolomon() {
     try {
       const res = await encodeRS(preset, message);
       setCodeword(res.data.codeword.split(',').map(Number));
+      setEncodeSteps(res.data.steps || null);
       setPhase('encoded');
     } catch (err) {
       setErrorMsg(extractError(err));
@@ -206,6 +209,32 @@ export default function ReedSolomon() {
             </div>
           </div>
 
+          {/* Идея кодирования — статичное пояснение */}
+          <div className="mb-4 p-3 border rounded bg-light text-start">
+          <h5>Идея кодирования</h5>
+          <p>
+            Код Рида–Соломона (RS) – недвоичный линейный блочный код, работающий с символами (обычно байтами). 
+            Широко используется в системах хранения данных (CD, DVD, QR-коды), спутниковой связи.
+          </p>
+          <p>
+            <strong>Параметры кода:</strong>
+          </p>
+          <ul>
+            <li>Длина кодового слова <strong>n</strong> символов (байт).</li>
+            <li>Длина сообщения <strong>k</strong> символов.</li>
+            <li>Количество проверочных символов <strong>n−k</strong>.</li>
+            <li>Исправляет до <strong>t</strong> ошибочных символов (любых, не только битовых ошибок).</li>
+          </ul>
+          <p>
+            Код строится над полем <strong>GF(2^8)</strong>, где каждый символ – это 8-битное число (байт). 
+            Примитивный элемент поля <strong>α</strong> обычно выбирается как корень многочлена 
+            <code>x^8 + x^4 + x^3 + x^2 + 1</code> (стандарт для RS(255,223)).
+          </p>
+          <p>
+            Свойство: Код Рида–Соломона является <strong>максимально возможным</strong> для заданных <em>n</em>, <em>k</em> – он достигает <strong>границы Синглтона</strong>.
+          </p>
+          </div>
+
           {/* ФАЗА 1: КОДИРОВАНИЕ */}
           <div className="mb-4 p-3 border rounded bg-light">
             <h5>1. Кодирование</h5>
@@ -228,6 +257,12 @@ export default function ReedSolomon() {
             >
               {loading ? 'Кодируем...' : 'Закодировать'}
             </button>
+
+            {encodeSteps && (
+                <div className="text-start mt-3">
+                <StepVisualizer steps={encodeSteps} />
+                </div>
+              )}
           </div>
 
           {/* ФАЗА 2: ВНЕСЕНИЕ ОШИБОК */}

@@ -14,6 +14,7 @@ class TaskStatusResponse(BaseModel):
     status: str
     result: dict | None = None
     steps: list | None = None
+    detail: str | None = None
 
 @router.post("/encode", response_model=EncodeResponse)
 def encode(req: RSEncodeRequest):
@@ -34,5 +35,6 @@ def get_task_status(task_id: str):
         "task_id": task_id,
         "status": task["status"],
         "result": task.get("result"),
-        "steps": task.get("steps")
+        "steps": task.get("steps"),
+        "detail": task.get("detail"),
     }
