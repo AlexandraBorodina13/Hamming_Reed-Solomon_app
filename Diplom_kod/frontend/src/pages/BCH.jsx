@@ -43,6 +43,8 @@ export default function BCH() {
   const [encodeSteps, setEncodeSteps] = useState(null);
   const [phase, setPhase] = useState('input');
 
+  const m = Math.log2(n + 1);
+
   useEffect(() => {
     resetAll();
   }, [preset]);
@@ -170,7 +172,42 @@ const handleIntroduceError = () => {
                 n = {n}, k = {k}, исправляет до {t} ошибок
               </div>
             </div>
+            
           </div>
+
+
+
+            <div className="mb-4 p-3 border rounded bg-light text-start">
+              <h5>Идея кодирования</h5>
+              <p>Код БЧХ – линейный циклический код, исправляющий кратные ошибки.</p>
+              <ul>
+                <li>Длина кодового слова <strong>n = {n}</strong>.</li>
+                <li>Число информационных битов <strong>k = {k}</strong>.</li>
+                <li>Исправляет до <strong>t = {t}</strong> ошибок.</li>
+              </ul>
+              <p>
+                Код строится над полем <strong>GF(2<sup>{Math.log2(n + 1)}</sup>)</strong> с 
+                примитивным элементом α, для которого α<sup>{Math.log2(n + 1)}</sup> = α + 1.
+              </p>
+              <p>
+                Порождающий полином <em>g(x)</em> – НОК минимальных полиномов для 
+                α<sup>1</sup>, α<sup>2</sup>, …, α<sup>2t</sup>. Его степень равна 
+                <strong>n−k = {n - k}</strong>.
+              </p>
+              <p>
+                Кодирование систематическое: информационные биты занимают старшие k позиций 
+                кодового слова, а младшие n−k позиций — проверочные биты, вычисляемые как 
+                остаток от деления <em>u(x)·x<sup>n−k</sup></em> на <em>g(x)</em>.
+              </p>
+              <p>
+                Декодирование основано на вычислении синдромов 
+                <em>S<sub>j</sub> = R(α<sup>j</sup>)</em> для j=1..2t, алгоритме 
+                Берлекэмпа–Месси для нахождения полинома локаторов ошибок и поиске Ченя для 
+                определения позиций ошибок.
+              </p>
+              </div>
+
+
 
           {/* 1. Кодирование */}
           <div className="mb-4 p-3 border rounded bg-light">

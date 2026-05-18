@@ -174,6 +174,7 @@ export default function Convolutional() {
               программирование). Свободное расстояние d<sub>free</sub> позволяет исправлять
               до t = ⌊(d<sub>free</sub>−1)/2⌋ ошибок.
             </p>
+
           </div>
 
           {/* 1. Кодирование */}

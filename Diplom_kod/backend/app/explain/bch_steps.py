@@ -292,9 +292,21 @@ def explain_bch_decode(received, codec):
         ))
     else:
         if locator_poly is not None:
-            deg = len(locator_poly) - 1
-            lp_str = _locator_poly_str(locator_poly)
-            coeffs_display = ",  ".join(f"$$\\lambda_{i} = {c}$$" for i, c in enumerate(locator_poly))
+            
+            
+            num_errors = len(error_positions) if error_positions else 0
+            if num_errors == 0:
+                locator_display = [1]
+            else:
+                # Берём первые (num_errors+1) коэффициентов
+                locator_display = locator_poly[:num_errors+1] if len(locator_poly) > num_errors else locator_poly
+            
+            
+            
+            
+            deg = len(locator_display) - 1
+            lp_str = _locator_poly_str(locator_display)
+            coeffs_display = ",  ".join(f"$$\\lambda_{i} = {c}$$" for i, c in enumerate(locator_display))
             description = (
                 "**Алгоритм Берлекэмпа–Месси** итеративно строит ЛРОС минимальной длины, "
                 "порождающий последовательность синдромов $S_1, S_2, \\ldots, S_{2t}$.\n\n"
@@ -316,7 +328,7 @@ def explain_bch_decode(received, codec):
         steps.append(Step(
             "bm",
             "Алгоритм Берлекэмпа–Месси (полином локаторов ошибок Λ(x))",
-            {"locator_poly": locator_poly, "description": description}
+            {"locator_poly": locator_display, "description": description}
         ))
 
     # ---------- Шаг 5: Поиск Ченя (локализации ошибок) – СТАРАЯ КОРРЕКТНАЯ ВЕРСИЯ ----------
