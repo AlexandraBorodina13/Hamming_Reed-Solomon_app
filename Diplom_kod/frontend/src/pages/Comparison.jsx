@@ -2,15 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { getComparisonInfo } from '../api/client';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, ZAxis
+  Tooltip, Legend, ResponsiveContainer, ZAxis,
+  BarChart, Bar  // <-- добавили импорт
 } from 'recharts';
 
-// Сопоставление типов для цветов на графике
 const TYPE_COLORS = {
   'Хэмминг': '#8884d8',
   'БЧХ': '#82ca9d',
   'Рид–Соломон': '#ffc658'
-  //'Свёрточный': '#ff7300'
+  // 'Свёрточный': '#ff7300'  // оставляем закомментированным, он не нужен на scatter
 };
 
 export default function Comparison() {
@@ -21,7 +21,6 @@ export default function Comparison() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Загрузка данных с бэкенда
   useEffect(() => {
     setLoading(true);
     getComparisonInfo()
@@ -30,13 +29,11 @@ export default function Comparison() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Фильтрация
   const filtered = useMemo(() => {
     if (filterType === 'Все') return data;
     return data.filter(c => c.type === filterType);
   }, [data, filterType]);
 
-  // Сортировка
   const sorted = useMemo(() => {
     if (!sortKey) return filtered;
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -49,18 +46,37 @@ export default function Comparison() {
     });
   }, [filtered, sortKey, sortDir]);
 
-  // Уникальные типы для фильтра
   const types = useMemo(() => ['Все', ...new Set(data.map(c => c.type))], [data]);
 
-  // Данные для scatter-plot (только те, где rate и error_capability можно нормализовать)
+  // Scatter-plot: только блоковые коды (Хэмминг, БЧХ, РС)
   const scatterData = useMemo(() => {
     return data
-      .filter(c => c.type !== 'Свёрточный') // для свёрточных особая метрика, можно тоже добавить
+      .filter(c => c.type !== 'Свёрточный')  // оставляем как было
       .map(c => {
         let y = 0;
         const match = c.error_capability.match(/t\s*=\s*(\d+)/);
-        if (match) y = Number(match[1]) / c.n; // нормированная исправляющая способность
+        if (match) y = Number(match[1]) / c.n;
         return { ...c, y };
+      });
+  }, [data]);
+
+  // Данные для свёрточных кодов: извлекаем d_free и K
+  const convData = useMemo(() => {
+    return data
+      .filter(c => c.type === 'Свёрточный')
+      .map(c => {
+        const match = c.error_capability.match(/d_free\s*=\s*(\d+)/);
+        const d_free = match ? Number(match[1]) : 0;
+        // Извлекаем K из строки вида "K=3, R=1/2 (7,5)" в поле n
+        let K = 3;
+        if (typeof c.n === 'string') {
+          const kmatch = c.n.match(/K=(\d+)/);
+          if (kmatch) K = Number(kmatch[1]);
+        }
+
+        const shortName = c.preset.replace(/,?\s*R=/, ', ');
+
+        return { ...c, d_free, K, shortName };
       });
   }, [data]);
 
@@ -80,7 +96,6 @@ export default function Comparison() {
     <div className="container mt-4">
       <h2 className="text-center mb-4">Сравнительный анализ кодов</h2>
 
-      {/* Теоретическое введение */}
       <div className="card mb-4">
         <div className="card-body">
           <h5>Компромисс между скоростью, избыточностью и исправляющей способностью</h5>
@@ -94,7 +109,6 @@ export default function Comparison() {
         </div>
       </div>
 
-      {/* Фильтр */}
       <div className="mb-3">
         <label className="me-2">Тип кода:</label>
         <select
@@ -106,7 +120,6 @@ export default function Comparison() {
         </select>
       </div>
 
-      {/* Таблица */}
       <div className="table-responsive">
         <table className="table table-bordered table-hover">
           <thead className="table-light">
@@ -146,10 +159,10 @@ export default function Comparison() {
         </table>
       </div>
 
-      {/* Визуализация: scatter-plot (опционально) */}
+      {/* График эффективности блоковых кодов (t/n vs R) */}
       {scatterData.length > 0 && (
         <div className="mt-5">
-          <h5>Эффективность кодов (нормированная исправляющая способность vs скорость)</h5>
+          <h5>Эффективность блоковых кодов (нормированная исправляющая способность vs скорость)</h5>
           <ResponsiveContainer width="100%" height={400}>
             <ScatterChart>
               <CartesianGrid />
@@ -182,7 +195,61 @@ export default function Comparison() {
         </div>
       )}
 
-      {/* Блок рекомендаций */}
+      {/* Отдельный график для свёрточных кодов с пояснением */}
+      {convData.length > 0 && (
+        <div className="mt-5">
+          <div className="card mb-3">
+            <div className="card-body">
+              <h5>Почему свёрточные коды вынесены отдельно?</h5>
+              <p>
+                Для блоковых кодов (Хэмминг, БЧХ, РС) исправляющая способность выражается числом гарантированно исправляемых ошибок <em>t</em>, которое напрямую связано с минимальным расстоянием <em>d = 2t+1</em>.
+                У свёрточных кодов нет фиксированной длины блока; их способность противостоять ошибкам характеризуется <strong>свободным расстоянием</strong> <em>d<sub>free</sub></em> — минимальным весом Хэмминга между любыми двумя путями на решётке.
+                Поэтому прямое сравнение <em>t</em> и <em>d<sub>free</sub></em> на одном графике было бы некорректным.
+                Ниже показано свободное расстояние для каждой конфигурации свёрточного кода в зависимости от длины ограничения <em>K</em>.
+              </p>
+            </div>
+          </div>
+
+          <h5>Свёрточные коды: свободное расстояние d<sub>free</sub></h5>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={convData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="shortName"
+                label={{ value: 'Конфигурация', position: 'insideBottom', offset: -5 }}
+              />
+              <YAxis
+                label={{ value: 'd_free', angle: -90, position: 'insideLeft' }}
+              />
+              <Tooltip />
+              <Bar dataKey="d_free" fill="#ff7300" name="Свободное расстояние" />
+            </BarChart>
+          </ResponsiveContainer>
+
+          {/* Дополнительная табличка для наглядности */}
+          <table className="table table-sm mt-3" style={{ maxWidth: 500 }}>
+            <thead>
+              <tr>
+                <th>Конфигурация</th>
+                <th>K</th>
+                <th>R</th>
+                <th>d<sub>free</sub></th>
+              </tr>
+            </thead>
+            <tbody>
+              {convData.map((c, idx) => (
+                <tr key={idx}>
+                  <td><code>{c.preset}</code></td>
+                  <td>{c.K}</td>
+                  <td>{c.rate}</td>
+                  <td>{c.d_free}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="card mt-4">
         <div className="card-body">
           <h5>Рекомендации по выбору кода</h5>
