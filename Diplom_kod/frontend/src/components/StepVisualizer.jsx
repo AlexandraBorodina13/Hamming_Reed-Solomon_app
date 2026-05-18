@@ -460,9 +460,22 @@ export default function StepVisualizer({ steps }) {
 
             {/* Результат */}
             {step.type === 'result' && (
-              <div style={{ background: '#efe', padding: 10, borderRadius: 5, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+              <div style={{
+                background: step.payload.success === false ? '#fee' : '#efe',
+                padding: 10,
+                borderRadius: 5
+              }}>
                 {step.payload.success === false ? (
-                  <p style={{ color: 'red' }}>Ошибка декодирования: {step.payload.description}</p>
+                  <div>
+                    {step.payload.description && (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
+                      >
+                        {step.payload.description}
+                      </ReactMarkdown>
+                    )}
+                  </div>
                 ) : (
                   <>
                     <p style={{ color: 'green', fontWeight: 'bold' }}>Декодирование завершено успешно.</p>

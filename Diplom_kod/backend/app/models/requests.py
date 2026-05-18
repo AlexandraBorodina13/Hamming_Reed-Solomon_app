@@ -6,6 +6,7 @@ from app.core.reed_solomon import RS_PRESETS
 class HammingEncodeRequest(BaseModel):
     m: int = Field(ge=3, le=6, description="Параметр m кода Хэмминга")
     message: str = Field(description="Строка из 0 и 1")
+    original_message: Optional[str] = Field(None, description="Исходное сообщение для проверки корректности")
 
     @field_validator('message')
     @classmethod
@@ -24,6 +25,7 @@ class HammingEncodeRequest(BaseModel):
 class HammingDecodeRequest(BaseModel):
     m: int = Field(ge=3, le=6)
     received: str
+    original_message: Optional[str] = Field(None, description="Исходное сообщение для проверки")
 
     @field_validator('received')
     @classmethod
@@ -134,3 +136,11 @@ class ConvDecodeRequest(BaseModel):
         if not set(v).issubset({'0','1'}):
             raise ValueError('Только 0 и 1')
         return v
+    
+    
+class AWGNRequest(BaseModel):
+    bits: str = Field(..., description="Кодовое слово (строка 0/1)")
+    snr_db: float = Field(..., ge=-10, le=30, description="SNR в дБ (Es/N0)")
+    n: Optional[int] = Field(None, description="Длина кодового слова")
+    k: Optional[int] = Field(None, description="Число информационных бит")
+    

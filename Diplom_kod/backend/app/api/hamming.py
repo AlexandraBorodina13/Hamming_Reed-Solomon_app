@@ -11,4 +11,4 @@ def encode(req: HammingEncodeRequest):
 
 @router.post("/decode", response_model=DecodeResponse)
 def decode(req: HammingDecodeRequest):
-    return HammingService.decode(req.m, req.received)
+    return HammingService.decode(req.m, req.received, req.original_message)

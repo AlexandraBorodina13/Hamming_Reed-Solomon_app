@@ -9,7 +9,7 @@ from app.core.hamming import (
 )
 
 
-def explain_hamming_general(received, m):
+def explain_hamming_general(received, m, original_message=None):
     """
     Подробное пошаговое объяснение декодирования кода Хэмминга.
     Соответствует структуре документа:
@@ -102,20 +102,36 @@ def explain_hamming_general(received, m):
         }
     ))
 
-    # Шаг 4: Исправление ошибки и извлечение информации
+    # Шаг 4: Исправление ошибки и результат
     if error_pos is not None and error_pos != "uncorrectable":
         corrected = received.copy()
         corrected[error_pos] ^= 1
         pos = info_positions(m)
         info_bits = corrected[pos]
-        corr_desc = (
-            f"Инвертируем $r_{{{error_pos}}}$: было {received[error_pos]} → "
-            f"стало {corrected[error_pos]}.\n"
-            f"Исправленное слово: $({' '.join(str(b) for b in corrected)})$.\n\n"
-            f"Извлекаем информационные биты с позиций {pos} (0‑индексация): "
-            f"${' '.join(str(b) for b in info_bits)} \\to$ сообщение "
-            f"**{''.join(str(b) for b in info_bits)}**."
-        )
+        decoded_str = ''.join(str(b) for b in info_bits)
+
+        # Проверка соответствия исходному сообщению
+        success = True
+        if original_message is not None and decoded_str != original_message:
+            success = False
+            corr_desc = (
+                f"Инвертируем $r_{{{error_pos}}}$: было {received[error_pos]} → "
+                f"стало {corrected[error_pos]}.\n"
+                f"Исправленное слово: $({' '.join(str(b) for b in corrected)})$.\n\n"
+                f"Извлекаем информационные биты: **{decoded_str}**.\n"
+                f"**Ошибка!** Полученное сообщение не совпадает с исходным (**{original_message}**). "
+                f"Вероятно, произошло более одной ошибки — код не смог их исправить."
+            )
+        else:
+            corr_desc = (
+                f"Инвертируем $r_{{{error_pos}}}$: было {received[error_pos]} → "
+                f"стало {corrected[error_pos]}.\n"
+                f"Исправленное слово: $({' '.join(str(b) for b in corrected)})$.\n\n"
+                f"Извлекаем информационные биты с позиций {pos} (0‑индексация): "
+                f"${' '.join(str(b) for b in info_bits)} \\to$ сообщение "
+                f"**{decoded_str}**."
+            )
+
         steps.append(Step(
             "result",
             "Исправление ошибки и результат",
@@ -124,13 +140,29 @@ def explain_hamming_general(received, m):
                 "original_length": k,
                 "info_bits": info_bits,
                 "description": corr_desc,
-                "success": True,
-                "decoded_str": ''.join(str(b) for b in info_bits),
+                "success": success,
+                "decoded_str": decoded_str,
             }
         ))
+
     elif error_pos is None:
+        # Синдром нулевой — ошибок не обнаружено
         pos = info_positions(m)
         info_bits = received[pos]
+        decoded_str = ''.join(str(b) for b in info_bits)
+
+        success = True
+        if original_message is not None and decoded_str != original_message:
+            success = False
+            desc = (
+                f"Синдром равен нулю — ошибок не обнаружено.\n"
+                f"Однако выделенное сообщение **{decoded_str}** не совпадает с исходным "
+                f"**{original_message}**. Это означает, что в принятом слове произошли ошибки, "
+                f"которые код не смог обнаружить (например, чётное число ошибок)."
+            )
+        else:
+            desc = "Ошибок нет, информационные биты выделены успешно."
+
         steps.append(Step(
             "result",
             "Результат",
@@ -138,12 +170,14 @@ def explain_hamming_general(received, m):
                 "corrected": received,
                 "original_length": k,
                 "info_bits": info_bits,
-                "description": "Ошибок нет, информационные биты выделены успешно.",
-                "success": True,
-                "decoded_str": ''.join(str(b) for b in info_bits),
+                "description": desc,
+                "success": success,
+                "decoded_str": decoded_str,
             }
         ))
+
     else:
+        # uncorrectable — уже было, оставляем как есть
         steps.append(Step(
             "result",
             "Ошибка",

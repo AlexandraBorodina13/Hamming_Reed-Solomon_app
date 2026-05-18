@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { encodeHamming, decodeHamming } from '../api/client';
+import { encodeHamming, decodeHamming, applyAWGN } from '../api/client';
 import StepVisualizer from '../components/StepVisualizer';
 
 export default function Hamming() {
@@ -11,11 +11,14 @@ export default function Hamming() {
   // === Поля ввода ===
   const [message, setMessage] = useState('1011');
   const [errorPos, setErrorPos] = useState(0);        // для ручного режима
-  const [errorMode, setErrorMode] = useState('manual'); // 'manual' | 'auto'
+  const [errorMode, setErrorMode] = useState('manual'); // 'manual' | 'auto' | 'awgn'
+
+  // AWGN
+  const [awgnSnr, setAwgnSnr] = useState(5);
 
   // === Результаты с сервера ===
-  const [codeword, setCodeword] = useState(null);     // закодированное слово
-  const [noisy, setNoisy] = useState(null);           // слово с ошибкой
+  const [codeword, setCodeword] = useState(null);
+  const [noisy, setNoisy] = useState(null);
   const [decodeResult, setDecodeResult] = useState(null);
   const [steps, setSteps] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -25,10 +28,6 @@ export default function Hamming() {
   const [encodeSteps, setEncodeSteps] = useState(null);
 
   // === Фазы процесса ===
-  // 'input' – только ввод сообщения (начало)
-  // 'encoded' – сообщение закодировано, показываем кодовое слово и блок внесения ошибок
-  // 'noisy' – ошибка внесена, показываем принятое слово и кнопку декодирования
-  // 'decoded' – декодирование выполнено, показываем результат и шаги
   const [phase, setPhase] = useState('input');
 
   // === Обработчики ===
@@ -39,7 +38,7 @@ export default function Hamming() {
     try {
       const res = await encodeHamming(m, message);
       setCodeword(res.data.codeword);
-      setEncodeSteps(res.data.steps || null);     // сохраняем шаги
+      setEncodeSteps(res.data.steps || null);
       setPhase('encoded');
     } catch (err) {
       setErrorMsg(extractError(err));
@@ -47,9 +46,24 @@ export default function Hamming() {
     setLoading(false);
   };
 
-  const handleIntroduceError = () => {
+  const handleIntroduceError = async () => {
     if (!codeword) return;
     setPositionError('');
+
+    if (errorMode === 'awgn') {
+      setLoading(true);
+      try {
+        const res = await applyAWGN(codeword, awgnSnr, n, k);
+        setNoisy(res.data.noisy_bits);
+        setPhase('noisy');
+        setErrorMsg('');
+      } catch (err) {
+        setErrorMsg(extractError(err));
+      }
+      setLoading(false);
+      return;
+    }
+
     if (errorMode === 'manual') {
         const pos = Number(errorPos);
         if (!Number.isInteger(pos) || pos < 0 || pos >= n){
@@ -74,7 +88,7 @@ export default function Hamming() {
     setErrorMsg('');
     setLoading(true);
     try {
-      const res = await decodeHamming(m, noisy);
+      const res = await decodeHamming(m, noisy, message);
       setDecodeResult(res.data);
       setSteps(res.data.steps);
       setPhase('decoded');
@@ -126,43 +140,42 @@ export default function Hamming() {
           {/* Идея кодирования — статичное пояснение */}
           <div className="mb-4 p-3 border rounded bg-light text-start">
             <h5>Идея кодирования</h5>
-            <p>Код Хэмминга – линейный блочный код. Из <strong>k = {k}</strong> информационных битов образуется <strong>n = {n}</strong> битов кодового слова. Добавляются <strong>m = {m}</strong> (n-k) проверочных бита так, чтобы для любого кодового слова <strong>c</strong> выполнялось равенство:</p>
+            <p>Код Хэмминга – линейный блочный код. Из <strong>k</strong> информационных битов образуется <strong>n</strong> битов кодового слова. Добавляются <strong>m</strong> (n-k) проверочных бита так, чтобы для любого кодового слова <strong>c</strong> выполнялось равенство:</p>
             <p className="text-center"><strong>H·c<sup>T</sup> = 0 (mod 2)</strong>,</p>
             <p>где <strong>H</strong> – проверочная матрица m×n, столбцы которой – все ненулевые m-битные векторы.</p>
             <p>Проверочные биты размещаются на <strong>позициях, которые являются степенями двойки</strong> (при 1-индексации: 1,2,4). В 0-индексации это позиции 0,1,3. Информационные биты – на остальных позициях (2,4,5,6). Такое размещение делает код <strong>систематическим</strong>: первые проверочные, потом информационные, но с пропуском позиции 3 для третьего проверочного.</p>
           </div>
 
           {/* === ФАЗА 1: ВВОД И КОДИРОВАНИЕ === */}
-            <div className="mb-4 p-3 border rounded bg-light">
-              <h5>1. Кодирование</h5>
-              <input
-                className="form-control mb-2"
-                placeholder="Введите сообщение"
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-              />
-              <button
-                className="btn btn-success"
-                onClick={handleEncode}
-                disabled={loading || message.length !== k}
-                >
-                {loading ? 'Кодируем...' : 'Закодировать'}
-              </button>
+          <div className="mb-4 p-3 border rounded bg-light">
+            <h5>1. Кодирование</h5>
+            <input
+              className="form-control mb-2"
+              placeholder="Введите сообщение"
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+            />
+            <button
+              className="btn btn-success"
+              onClick={handleEncode}
+              disabled={loading || message.length !== k}
+            >
+              {loading ? 'Кодируем...' : 'Закодировать'}
+            </button>
 
-              {/* Результат кодирования и шаги (появляются только после успешного кодирования) */}
-              {codeword && (
-                <>
-                  <div className="alert alert-success mt-3">
+            {codeword && (
+              <>
+                <div className="alert alert-success mt-3">
                   Кодовое слово: <strong>{codeword}</strong>
                 </div>
-                  {encodeSteps && (
-                    <div className="text-start mt-3">
-                      <StepVisualizer steps={encodeSteps} />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                {encodeSteps && (
+                  <div className="text-start mt-3">
+                    <StepVisualizer steps={encodeSteps} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {/* === ФАЗА 2: ВНЕСЕНИЕ ОШИБОК === */}
           {phase !== 'input' && (
@@ -187,32 +200,64 @@ export default function Hamming() {
                   />
                   <label className="form-check-label">Случайная ошибка</label>
                 </div>
+                <div className="form-check form-check-inline">
+                  <input
+                    className="form-check-input"
+                    type="radio"
+                    checked={errorMode === 'awgn'}
+                    onChange={() => setErrorMode('awgn')}
+                  />
+                  <label className="form-check-label">AWGN канал</label>
+                </div>
               </div>
+
               {errorMode === 'manual' && (
                 <div className="row d-flex justify-content-center mb-2">
-                    <div className="col-md-3">
+                  <div className="col-md-3">
                     <input
-                        className="form-control mb-2"
-                        type="number"
-                        min="0"
-                        max={n - 1}
-                        value={errorPos}
-                        onChange={e => {
+                      className="form-control mb-2"
+                      type="number"
+                      //min="0"
+                      max={n - 1}
+                      value={errorPos}
+                      onChange={e => {
                         setErrorPos(e.target.value);
                         setPositionError('');
-                    }}
+                      }}
                     />
                     {positionError && <div className="text-danger mb-2">{positionError}</div>}
-                    </div>
+                  </div>
+                  
+                </div>
+                
+              )}
+
+              {errorMode === 'awgn' && (
+                <div className="row d-flex justify-content-center mb-2">
+                  <div className="col-md-3">
+                    <label className="form-label">SNR (дБ)</label>
+                    <input
+                      className="form-control"
+                      type="number"
+                      value={awgnSnr}
+                      onChange={e => setAwgnSnr(Number(e.target.value))}
+                      step="0.5"
+                    />
+                    <div className="form-text">Eb/N0 в децибелах</div>
+                  </div>
+                  <div className="form-text">Eb/N0 в дБ. Для демонстрации отказов попробуйте отрицательные значения (-7..-10 дБ)</div>
                 </div>
               )}
-              <button className="btn btn-warning" onClick={handleIntroduceError}>
-                Внести ошибку
+
+              <button className="btn btn-warning" onClick={handleIntroduceError} disabled={loading}>
+                {loading ? 'Применение...' : errorMode === 'awgn' ? 'Пропустить через канал' : 'Внести ошибку'}
               </button>
+
               {noisy && (
                 <div className="alert alert-info mt-2">
                   Принятое слово: <strong>{noisy}</strong>
                   {errorMode === 'auto' && <span> (ошибка в позиции {errorPos})</span>}
+                  {errorMode === 'awgn' && <span> (AWGN, SNR = {awgnSnr} дБ)</span>}
                 </div>
               )}
             </div>
@@ -236,8 +281,11 @@ export default function Hamming() {
           {phase === 'decoded' && decodeResult && (
             <div className="mb-4 p-3 border rounded bg-light">
               <h5>4. Результат</h5>
-              <div className="alert alert-success">
-                Декодированное сообщение: <strong>{decodeResult.decoded}</strong>
+              <div className={`alert ${decodeResult.success ? 'alert-success' : 'alert-danger'}`}>
+                  {decodeResult.success
+                ? <>Декодированное сообщение: <strong>{decodeResult.decoded}</strong></>
+                : <>Ошибка декодирования! Получено: <strong>{decodeResult.decoded}</strong> (исходное: {message})</>
+                  }
               </div>
               {decodeResult.error_positions?.length > 0 && (
                 <p>Ошибки исправлены в позициях: {decodeResult.error_positions.join(', ')}</p>
@@ -245,8 +293,6 @@ export default function Hamming() {
               <div className="text-start mt-3">
                 <StepVisualizer steps={steps} />
               </div>
-              {/* Кнопки экспорта можно добавить позже */}
-              {/* <button className="btn btn-secondary">Скачать HTML-отчёт</button> */}
             </div>
           )}
 

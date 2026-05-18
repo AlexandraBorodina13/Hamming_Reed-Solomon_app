@@ -60,12 +60,22 @@ class HammingService:
             params={"n": n, "k": k, "m": m},
             steps=[StepDTO(type=s.type, title=s.title, payload=_make_serializable(s.payload)) for s in steps]
         )
-
+        
     @staticmethod
-    def decode(m: int, received: str) -> DecodeResponse:
+    def decode(m: int, received: str, original_message: str = None) -> DecodeResponse:
         bits = np.array([int(b) for b in received], dtype=int)
         corrected, info = decode_general(bits, m)
-        steps = explain_hamming_general(bits, m)
+        steps = explain_hamming_general(bits, m, original_message)   # передаём original
+
+        pos = info_positions(m)
+        decoded_bits = corrected[pos]
+        decoded_str = "".join(map(str, decoded_bits))
+
+        # Определяем настоящий успех
+        success = (info["error_pos"] != "uncorrectable")
+        if original_message is not None:
+            success = success and (decoded_str == original_message)
+
         err_pos = info.get("error_pos")
         if err_pos == "uncorrectable":
             err_pos = []
@@ -73,14 +83,12 @@ class HammingService:
             err_pos = [err_pos]
         else:
             err_pos = []
-        # Информационные биты
-        pos = info_positions(m)
-        decoded_bits = corrected[pos]
+
         return DecodeResponse(
-            decoded="".join(map(str, decoded_bits)),
-            success=info["error_pos"] != "uncorrectable",
+            decoded=decoded_str,
+            success=success,
             steps=[StepDTO(type=s.type, title=s.title, payload=_make_serializable(s.payload)) for s in steps],
-            error_positions=err_pos  # это уже список
+            error_positions=err_pos
         )
 
 

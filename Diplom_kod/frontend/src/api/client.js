@@ -10,8 +10,8 @@ const api = axios.create({
 export const encodeHamming = (m, message) =>
   api.post('/hamming/encode', { m, message });
 
-export const decodeHamming = (m, received) =>
-  api.post('/hamming/decode', { m, received });
+export const decodeHamming = (m, received, original_message = null) =>
+  api.post('/hamming/decode', { m, received, original_message });
 
 // ===================== БЧХ =====================
 export const encodeBCH = (preset, message) =>
@@ -43,6 +43,10 @@ export const decodeConvolutional = (preset, received) =>
   //api.post('/comparison', params);
 export const getComparisonInfo = () =>
   api.get('/comparison/info');
+
+export const applyAWGN = (bits, snr_db, n, k) =>
+  api.post('/channel/awgn', { bits, snr_db, n, k });
+
 
 // ===================== Экспорт отчётов =====================
 export const exportPDF = (payload) =>
