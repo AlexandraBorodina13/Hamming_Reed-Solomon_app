@@ -39,8 +39,10 @@ export const decodeConvolutional = (preset, received) =>
   api.post('/conv/decode', { preset, received });
 
 // ===================== Сравнение кодов (заглушка) =====================
-export const compareCodes = (params) =>
-  api.post('/comparison', params);
+//export const compareCodes = (params) =>
+  //api.post('/comparison', params);
+export const getComparisonInfo = () =>
+  api.get('/comparison/info');
 
 // ===================== Экспорт отчётов =====================
 export const exportPDF = (payload) =>

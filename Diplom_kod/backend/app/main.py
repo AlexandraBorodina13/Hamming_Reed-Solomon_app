@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import hamming, bch, reed_solomon, convolutional
+from app.api import hamming, bch, reed_solomon, convolutional, comparison
 
 app = FastAPI(
     title="Coding Playground API",
@@ -19,6 +19,7 @@ app.include_router(hamming.router)
 app.include_router(bch.router)
 app.include_router(reed_solomon.router)
 app.include_router(convolutional.router)
+app.include_router(comparison.router)
 
 @app.get("/")
 def root():

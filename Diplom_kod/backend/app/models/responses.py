@@ -17,3 +17,17 @@ class DecodeResponse(BaseModel):
     steps: list[StepDTO]
     error_positions: list[int] = []
     final_metric: float | None = None
+    
+class CodecSummary(BaseModel):
+    type: str
+    preset: str
+    n: Any
+    k: Any
+    rate: float
+    redundancy: float
+    error_capability: str
+    field_size: int
+    notes: str
+
+class ComparisonResponse(BaseModel):
+    codes: list[CodecSummary]
