@@ -196,27 +196,33 @@ class ConvolutionalService:
 
     @staticmethod
     def encode(preset: str, message: str) -> EncodeResponse:
+        from app.explain.convolutional_steps import explain_conv_encode
         codec = ConvolutionalService.get_codec(preset)
         bits = np.array([int(b) for b in message], dtype=int)
-        encoded = codec.encode(bits)
+        steps, encoded = explain_conv_encode(bits, codec)
         return EncodeResponse(
             codeword="".join(map(str, encoded)),
             params={
                 "constraint_length": codec.constraint_length,
                 "rate": f"{codec.rate_num}/{codec.rate_den}",
-                "generators": codec.generators
-            }
+                "generators": codec.generators,
+                "memory": codec.memory,
+                "num_states": codec.num_states,
+            },
+            steps=[StepDTO(type=s.type, title=s.title,
+                           payload=_make_serializable(s.payload)) for s in steps]
         )
 
     @staticmethod
     def decode(preset: str, received: str) -> DecodeResponse:
+        from app.explain.convolutional_steps import explain_conv_decode
         codec = ConvolutionalService.get_codec(preset)
         bits = np.array([int(b) for b in received], dtype=int)
-        steps, decoded, info = explain_convolutional(bits, codec)
+        steps, decoded, info = explain_conv_decode(bits, codec)
         return DecodeResponse(
             decoded="".join(map(str, decoded)),
             success=info.get("success", False),
-            # ВАЖНО: сериализуем payload шагов
-            steps=[StepDTO(type=s.type, title=s.title, payload=_make_serializable(s.payload)) for s in steps],
+            steps=[StepDTO(type=s.type, title=s.title,
+                           payload=_make_serializable(s.payload)) for s in steps],
             final_metric=info.get("final_metric")
         )
