@@ -28,6 +28,10 @@ class CodecSummary(BaseModel):
     error_capability: str
     field_size: int
     notes: str
+    complexity_time: Optional[str] = None
+    complexity_memory: Optional[str] = None
+    complexity_class: Optional[str] = None
+    ber_samples: Optional[list[dict]] = None
 
 class ComparisonResponse(BaseModel):
     codes: list[CodecSummary]
