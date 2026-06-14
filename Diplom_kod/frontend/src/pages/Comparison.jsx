@@ -7,10 +7,10 @@ import {
 } from 'recharts';
 
 const TYPE_COLORS = {
-  'Хэмминг': '#8884d8',
-  'БЧХ': '#82ca9d',
-  'Рид–Соломон': '#ffc658',
-  'Свёрточный': '#ff7300'   // для линий можно использовать тот же цвет
+  'Хэмминг': '#6610f2',
+  'БЧХ': '#1db954',
+  'Рид–Соломон': '#ffb300',
+  'Свёрточный': '#ff5400'   // для линий можно использовать тот же цвет
 };
 
 export default function Comparison() {
@@ -77,11 +77,23 @@ export default function Comparison() {
       });
   }, [data]);
 
+  // Для графика BER берём только первые 3 пресета каждого типа кода,
+  // иначе линий слишком много и они сливаются
+  const berCodes = useMemo(() => {
+    const countByType = {};
+    return data.filter(code => {
+      const cnt = countByType[code.type] || 0;
+      if (cnt >= 3) return false;
+      countByType[code.type] = cnt + 1;
+      return true;
+    });
+  }, [data]);
+
   // Данные для графика BER
   const berChartData = useMemo(() => {
-    // Собираем все уникальные SNR из всех кодов
+    // Собираем все уникальные SNR из выбранных кодов
     const snrSet = new Set();
-    data.forEach(code => {
+    berCodes.forEach(code => {
       code.ber_samples?.forEach(p => snrSet.add(p.snr));
     });
     const snrList = Array.from(snrSet).sort((a, b) => a - b);
@@ -89,14 +101,14 @@ export default function Comparison() {
     // Для каждого SNR создаём точку с полями-именами пресетов
     snrList.forEach(snr => {
       const point = { snr };
-      data.forEach(code => {
+      berCodes.forEach(code => {
         const sample = code.ber_samples?.find(s => s.snr === snr);
         if (sample) point[code.preset] = sample.ber;
       });
       result.push(point);
     });
     return result;
-  }, [data]);
+  }, [berCodes]);
 
   const handleSort = (key) => {
     if (sortKey === key) {
@@ -279,7 +291,7 @@ export default function Comparison() {
               />
               <Tooltip />
               <Legend />
-              {data.map(code => (
+              {berCodes.map(code => (
                 <Line
                   key={code.preset}
                   type="monotone"
