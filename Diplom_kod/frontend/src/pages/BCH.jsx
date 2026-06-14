@@ -214,10 +214,17 @@ const handleIntroduceError = () => {
             <h5>1. Кодирование</h5>
             <input
               className="form-control mb-2"
-              placeholder="Введите сообщение"
+              placeholder={`Введите сообщение (${k} бит)`}
               value={message}
               onChange={e => setMessage(e.target.value)}
             />
+            <div className="form-text mb-2">
+              {message.length === k
+                ? `Введено ${k} из ${k} бит — готово к кодированию`
+                : message.length < k
+                  ? `Введено ${message.length} из ${k} бит. Осталось ввести ${k - message.length}`
+                  : `Введено ${message.length} из ${k} бит. Лишних ${message.length - k} — удалите их`}
+            </div>
             <button
               className="btn btn-success"
               onClick={handleEncode}
