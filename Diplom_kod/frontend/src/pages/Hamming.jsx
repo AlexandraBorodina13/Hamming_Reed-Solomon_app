@@ -66,10 +66,6 @@ export default function Hamming() {
 
     if (errorMode === 'manual') {
         const pos = Number(errorPos);
-        if (!Number.isInteger(pos) || pos < 0 || pos >= n){
-            setPositionError(`Позиция должна быть целым числом от 0 до ${n - 1}`);
-            return;
-        }
         const arr = codeword.split('');
         arr[pos] = arr[pos] === '0' ? '1' : '0';
         setNoisy(arr.join(''));
@@ -117,7 +113,7 @@ export default function Hamming() {
   };
 
   return (
-    <div className="container mt-4">
+    <div className="container-xxl mt-4">
       <div className="card shadow-sm">
         <div className="card-body">
           <h2 className="card-title text-center">Код Хэмминга ({n}, {k})</h2>
@@ -221,22 +217,18 @@ export default function Hamming() {
               {errorMode === 'manual' && (
                 <div className="row d-flex justify-content-center mb-2">
                   <div className="col-md-3">
-                    <input
-                      className="form-control mb-2"
-                      type="number"
-                      //min="0"
-                      max={n - 1}
+                    <label className="form-label">Позиция ошибки</label>
+                    <select
+                      className="form-select mb-2"
                       value={errorPos}
-                      onChange={e => {
-                        setErrorPos(e.target.value);
-                        setPositionError('');
-                      }}
-                    />
-                    {positionError && <div className="text-danger mb-2">{positionError}</div>}
+                      onChange={e => setErrorPos(Number(e.target.value))}
+                    >
+                      {Array.from({ length: n }, (_, i) => (
+                        <option key={i} value={i}>{i}</option>
+                      ))}
+                    </select>
                   </div>
-                  
                 </div>
-                
               )}
 
               {errorMode === 'awgn' && (

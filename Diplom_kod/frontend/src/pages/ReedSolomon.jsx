@@ -185,7 +185,7 @@ export default function ReedSolomon() {
   };
 
   return (
-    <div className="container mt-4">
+    <div className="container-xxl mt-4">
       <div className="card shadow-sm">
         <div className="card-body">
           <h2 className="card-title text-center">Код Рида–Соломона</h2>

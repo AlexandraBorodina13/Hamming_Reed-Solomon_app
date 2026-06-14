@@ -17,7 +17,7 @@ def _locator_poly_str(coeffs, var='x'):
         elif i == 1:
             terms.append(f"{c}{var}" if c != 1 else var)
         else:
-            terms.append(f"{c}{var}^{i}" if c != 1 else f"{var}^{i}")
+            terms.append(f"{c}{var}^{{{i}}}" if c != 1 else f"{var}^{{{i}}}")
     return " + ".join(terms) if terms else "1"
 
 def _bits_to_polynomial_str(bits, var='x', msb_first=True):
@@ -49,7 +49,7 @@ def _poly_from_coeffs(coeffs, var='x'):
         elif i == 1:
             terms.append(f"{c}{var}" if c != 1 else var)
         else:
-            terms.append(f"{c}{var}^{i}" if c != 1 else f"{var}^{i}")
+            terms.append(f"{c}{var}^{{{i}}}" if c != 1 else f"{var}^{{{i}}}")
     return " + ".join(terms) if terms else "0"
 
 def _alpha_power_table(GF, alpha, n):
@@ -104,7 +104,7 @@ def explain_bch_encode(codec, message_bits):
             f"$$c(x) = u(x) \\cdot x^{{n-k}} + \\bigl(u(x) \\cdot x^{{n-k}} \\bmod g(x)\\bigr)$$\n"
             f"Проверочные биты - это остаток от деления $u(x) \\cdot x^{{n-k}}$ на $g(x)$\n"
             f"- Параметры кода: $n = {n}$, $k = {k}$, $t = {t}$\n"
-            f"- Примитивный элемент поля: $α$, для которого выполняется $α^{{{m}}} = α + 1$ (примитивный многочлен $p(x)=x^{m}+x+1$)\n"
+            f"- Примитивный элемент поля: $α$, для которого выполняется $α^{{{m}}} = α + 1$ (примитивный многочлен $p(x)=x^{{{m}}}+x+1$)\n"
             f"- Порождающий полином $g(x)$ степени $n-k = {n-k}$\n"
         )}
     ))
@@ -221,7 +221,7 @@ def explain_bch_decode(received, codec):
     steps.append(Step(
         "text",
         "Параметры кода БЧХ",
-        {"description": f"Код $({n},{k})$ над $GF(2^{m})$, исправляет до $t={t}$ ошибок, $α$ – примитивный элемент."}
+        {"description": f"Код $({n},{k})$ над $GF(2^{{{m}}})$, исправляет до $t={t}$ ошибок, $α$ – примитивный элемент."}
     ))
 
     # ---------- Шаг 2: Принятое слово ----------
@@ -255,9 +255,9 @@ def explain_bch_decode(received, codec):
             for i, bit in enumerate(recv_list):
                 if bit:
                     exp = (j * (n - 1 - i)) % field_order
-                    terms.append(f"α^{{{j}·{n-1-i}}} = α^{exp} = {alpha_powers[exp]}")
+                    terms.append(f"α^{{{j}·{n-1-i}}} = α^{{{exp}}} = {alpha_powers[exp]}")
             terms_str = " ⊕ ".join(terms) if terms else "0"
-            calc_details.append(f"$S_{j} = R(α^{j}) = {terms_str} = {s_val}$\n")
+            calc_details.append(f"$S_{{{j}}} = R(α^{{{j}}}) = {terms_str} = {s_val}$\n")
         all_zero = all(s == 0 for s in syndromes)
         verdict = "Все синдромы равны нулю → ошибок нет." if all_zero else "Обнаружены ненулевые синдромы → есть ошибки."
         steps.append(Step(
@@ -306,7 +306,7 @@ def explain_bch_decode(received, codec):
             
             deg = len(locator_display) - 1
             lp_str = _locator_poly_str(locator_display)
-            coeffs_display = ",  ".join(f"$$\\lambda_{i} = {c}$$" for i, c in enumerate(locator_display))
+            coeffs_display = ",  ".join(f"$$\\lambda_{{{i}}} = {c}$$" for i, c in enumerate(locator_display))
             description = (
                 "**Алгоритм Берлекэмпа–Месси** итеративно строит ЛРОС минимальной длины, "
                 "порождающий последовательность синдромов $S_1, S_2, \\ldots, S_{2t}$.\n\n"

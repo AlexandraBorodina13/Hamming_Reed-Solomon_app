@@ -47,9 +47,9 @@ def explain_conv_encode(message, conv_code: ConvolutionalCode):
             latex_terms.append("\\text{вход}")
         for r in range(1, K):
             if mask[r] == 1:
-                latex_terms.append(f"\\text{{рег}}_{r}")
+                latex_terms.append(f"\\text{{рег}}_{{{r}}}")
         formula_latex = " \\oplus ".join(latex_terms)
-        output_formulas.append(f"$$c_{g_idx} = {formula_latex}$$")
+        output_formulas.append(f"$$c_{{{g_idx}}} = {formula_latex}$$")
 
     steps.append(Step(
         "text",

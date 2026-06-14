@@ -134,7 +134,7 @@ export default function Convolutional() {
   };
 
   return (
-    <div className="container mt-4">
+    <div className="container-xxl mt-4">
       <div className="card shadow-sm">
         <div className="card-body">
           <h2 className="card-title text-center">Свёрточный код</h2>

@@ -117,7 +117,7 @@ export default function Comparison() {
   ];
 
   return (
-    <div className="container mt-4">
+    <div className="container-xxl mt-4">
       <h2 className="text-center mb-4">Сравнительный анализ кодов</h2>
 
       <div className="card mb-4">
